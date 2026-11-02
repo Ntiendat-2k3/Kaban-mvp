@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.next/
+.next-dev/
+.history/
+.playwright-mcp/
+*.db
+data/
+.env
+.env*.local
+*.log
+coverage/
+web/tsconfig.tsbuildinfo
+*.tsbuildinfo

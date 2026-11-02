@@ -1,0 +1,641 @@
+openapi: 3.0.3
+info:
+  title: Trello Clone API
+  version: 1.0.0
+  description: >
+    Hợp đồng API duy nhất (nguồn VERIFIED cho WF SRS/API). Lỗi luôn có dạng
+    { error: { code, message, details? } }. Vị trí list/card do server tính từ toIndex.
+servers:
+  - url: http://localhost:4000/api
+security:
+  - bearerAuth: []
+tags:
+  - { name: Auth }
+  - { name: Boards }
+  - { name: Lists }
+  - { name: Cards }
+  - { name: Labels }
+  - { name: Checklists }
+  - { name: Comments }
+  - { name: Attachments }
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RegisterInput' } } } }
+      responses:
+        '201': { description: Tạo tài khoản và đăng nhập, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getMe
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /boards:
+    get:
+      tags: [Boards]
+      operationId: listBoards
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, archived], default: active } }
+      responses:
+        '200': { description: Bảng của tôi (owner hoặc member), content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Board' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Boards]
+      operationId: createBoard
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BoardInput' } } } }
+      responses:
+        '201': { description: "Tạo bảng, owner là người gọi, seed 6 nhãn mặc định", content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /boards/{boardId}:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    get:
+      tags: [Boards]
+      operationId: getBoardDetail
+      description: Trả board, members, labels, lists chưa archive kèm cards chưa archive, đã sắp theo position.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BoardDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Boards]
+      operationId: updateBoard
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BoardPatch' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /boards/{boardId}/archive:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    post:
+      tags: [Boards]
+      operationId: archiveBoard
+      description: Chỉ owner.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/restore:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    post:
+      tags: [Boards]
+      operationId: restoreBoard
+      description: Chỉ owner.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/star:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    put:
+      tags: [Boards]
+      operationId: starBoard
+      responses:
+        '204': { description: Đã gắn sao (idempotent) }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Boards]
+      operationId: unstarBoard
+      responses:
+        '204': { description: Đã bỏ sao (idempotent) }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/members:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    get:
+      tags: [Boards]
+      operationId: listBoardMembers
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Member' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Boards]
+      operationId: addBoardMember
+      description: Chỉ owner. 404 USER_NOT_FOUND nếu email chưa đăng ký; 409 ALREADY_MEMBER nếu đã là thành viên.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Member' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /boards/{boardId}/members/{userId}:
+    parameters:
+      - { $ref: '#/components/parameters/BoardId' }
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Boards]
+      operationId: removeBoardMember
+      description: Owner xoá member khác; member tự rời (userId = chính mình). Owner không thể bị xoá (403 OWNER_CANNOT_LEAVE).
+      responses:
+        '204': { description: "Đã xoá, gỡ luôn khỏi các card của bảng" }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/lists:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    post:
+      tags: [Lists]
+      operationId: createList
+      description: Thêm vào cuối bảng.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NameInput' } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /lists/{listId}:
+    parameters: [ { $ref: '#/components/parameters/ListId' } ]
+    patch:
+      tags: [Lists]
+      operationId: updateList
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NameInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /lists/{listId}/move:
+    parameters: [ { $ref: '#/components/parameters/ListId' } ]
+    post:
+      tags: [Lists]
+      operationId: moveList
+      description: toIndex tính trên danh sách list chưa archive, bắt đầu từ 0; ngoài khoảng thì kẹp vào biên.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [toIndex], properties: { toIndex: { type: integer, minimum: 0 } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /lists/{listId}/archive:
+    parameters: [ { $ref: '#/components/parameters/ListId' } ]
+    post:
+      tags: [Lists]
+      operationId: archiveList
+      responses:
+        '204': { description: Đã lưu trữ list (cards bên trong cũng ẩn theo) }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /lists/{listId}/cards:
+    parameters: [ { $ref: '#/components/parameters/ListId' } ]
+    post:
+      tags: [Cards]
+      operationId: createCard
+      description: Thêm vào cuối list.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [title], properties: { title: { type: string, minLength: 1, maxLength: 512 } } } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /cards/{cardId}:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    get:
+      tags: [Cards]
+      operationId: getCard
+      description: Kể cả card đã archive (archived = true).
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardDetail' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Cards]
+      operationId: updateCard
+      description: dueDate nullable; gửi null để xoá hạn (khi đó dueComplete tự về false).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CardPatch' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardDetail' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /cards/{cardId}/move:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    post:
+      tags: [Cards]
+      operationId: moveCard
+      description: Chuyển trong cùng list hoặc sang list khác cùng bảng. toIndex tính trên card chưa archive của list đích.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [toListId, toIndex], properties: { toListId: { type: string, format: uuid }, toIndex: { type: integer, minimum: 0 } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /cards/{cardId}/duplicate:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    post:
+      tags: [Cards]
+      operationId: duplicateCard
+      description: Nhân bản thẻ ngay sau thẻ gốc, gồm nội dung, nhãn, thành viên, checklist và tệp đính kèm; không sao chép bình luận.
+      responses:
+        '201': { description: Đã nhân bản, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/archive:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    post:
+      tags: [Cards]
+      operationId: archiveCard
+      responses:
+        '204': { description: Đã lưu trữ }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/restore:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    post:
+      tags: [Cards]
+      operationId: restoreCard
+      description: Khôi phục vào cuối list gốc; nếu list gốc đã archive thì 409 LIST_ARCHIVED.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /cards/{cardId}/labels/{labelId}:
+    parameters:
+      - { $ref: '#/components/parameters/CardId' }
+      - { name: labelId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Labels]
+      operationId: addCardLabel
+      responses:
+        '204': { description: Đã gán (idempotent) }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Labels]
+      operationId: removeCardLabel
+      responses:
+        '204': { description: Đã gỡ (idempotent) }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/members/{userId}:
+    parameters:
+      - { $ref: '#/components/parameters/CardId' }
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Cards]
+      operationId: addCardMember
+      description: userId phải là thành viên bảng, ngược lại 422 NOT_BOARD_MEMBER.
+      responses:
+        '204': { description: Đã gán (idempotent) }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+    delete:
+      tags: [Cards]
+      operationId: removeCardMember
+      responses:
+        '204': { description: Đã gỡ (idempotent) }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/labels:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    post:
+      tags: [Labels]
+      operationId: createLabel
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LabelInput' } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Label' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /labels/{labelId}:
+    parameters: [ { name: labelId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Labels]
+      operationId: updateLabel
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LabelInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Label' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+    delete:
+      tags: [Labels]
+      operationId: deleteLabel
+      responses:
+        '204': { description: Đã xoá và gỡ khỏi mọi card }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/checklists:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    post:
+      tags: [Checklists]
+      operationId: createChecklist
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [title], properties: { title: { type: string, minLength: 1, maxLength: 100 } } } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Checklist' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /checklists/{checklistId}:
+    parameters: [ { name: checklistId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete:
+      tags: [Checklists]
+      operationId: deleteChecklist
+      responses:
+        '204': { description: Đã xoá cùng các item }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /checklists/{checklistId}/items:
+    parameters: [ { name: checklistId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Checklists]
+      operationId: createChecklistItem
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 512 } } } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChecklistItem' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /checklist-items/{itemId}:
+    parameters: [ { name: itemId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Checklists]
+      operationId: updateChecklistItem
+      requestBody: { required: true, content: { application/json: { schema: { type: object, minProperties: 1, properties: { text: { type: string, minLength: 1, maxLength: 512 }, done: { type: boolean } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChecklistItem' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+    delete:
+      tags: [Checklists]
+      operationId: deleteChecklistItem
+      responses:
+        '204': { description: Đã xoá }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/comments:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    post:
+      tags: [Comments]
+      operationId: createComment
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentInput' } } } }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Comment' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /comments/{commentId}:
+    parameters: [ { name: commentId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Comments]
+      operationId: updateComment
+      description: Chỉ tác giả (403 nếu không phải). Đặt editedAt.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Comment' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+    delete:
+      tags: [Comments]
+      operationId: deleteComment
+      description: Chỉ tác giả.
+      responses:
+        '204': { description: Đã xoá }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/attachments:
+    parameters: [ { $ref: '#/components/parameters/CardId' } ]
+    get:
+      tags: [Attachments]
+      operationId: getAttachments
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Attachment' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Attachments]
+      operationId: uploadAttachment
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                isCover: { type: boolean }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Attachment' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: Dung lượng tệp vượt quá giới hạn }
+        '422': { $ref: '#/components/responses/Validation' }
+  /cards/{cardId}/attachments/{attachmentId}:
+    parameters:
+      - { $ref: '#/components/parameters/CardId' }
+      - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Attachments]
+      operationId: deleteAttachment
+      responses:
+        '204': { description: Đã xoá }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/attachments/{attachmentId}/cover:
+    parameters:
+      - { $ref: '#/components/parameters/CardId' }
+      - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Attachments]
+      operationId: setAttachmentCover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isCover]
+              properties:
+                isCover: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Attachment' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cards/{cardId}/attachments/{attachmentId}/duplicate:
+    parameters:
+      - { $ref: '#/components/parameters/CardId' }
+      - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Attachments]
+      operationId: duplicateAttachment
+      description: Nhân bản bản ghi đính kèm trong cùng thẻ, dùng chung tệp gốc và không đặt làm bìa.
+      responses:
+        '201': { description: Đã nhân bản, content: { application/json: { schema: { $ref: '#/components/schemas/Attachment' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    BoardId: { name: boardId, in: path, required: true, schema: { type: string, format: uuid } }
+    ListId: { name: listId, in: path, required: true, schema: { type: string, format: uuid } }
+    CardId: { name: cardId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Unauthorized: { description: "Thiếu hoặc sai token (code UNAUTHORIZED, hoặc INVALID_CREDENTIALS khi đăng nhập)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: "Không đủ quyền (code FORBIDDEN, OWNER_CANNOT_LEAVE)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: "Không tồn tại hoặc không phải thành viên bảng (code NOT_FOUND, USER_NOT_FOUND)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: "Xung đột (code EMAIL_TAKEN, ALREADY_MEMBER, LIST_ARCHIVED)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Validation: { description: "Dữ liệu không hợp lệ (code VALIDATION_ERROR, details theo field)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: array, items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } } }
+    User:
+      type: object
+      required: [id, email, name]
+      properties: { id: { type: string, format: uuid }, email: { type: string, format: email }, name: { type: string } }
+    RegisterInput:
+      type: object
+      required: [email, name, password]
+      properties:
+        email: { type: string, format: email }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string } }
+    AuthResult:
+      type: object
+      required: [user, token]
+      properties: { user: { $ref: '#/components/schemas/User' }, token: { type: string, description: JWT hạn 7 ngày } }
+    Background:
+      type: string
+      enum: [blue, orange, green, red, purple, pink, lime, sky]
+    Role:
+      type: string
+      enum: [owner, member]
+    Board:
+      type: object
+      required: [id, name, background, archived, isStarred, role]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        background: { $ref: '#/components/schemas/Background' }
+        archived: { type: boolean }
+        isStarred: { type: boolean }
+        role: { $ref: '#/components/schemas/Role' }
+    BoardInput:
+      type: object
+      required: [name]
+      properties: { name: { type: string, minLength: 1, maxLength: 100 }, background: { $ref: '#/components/schemas/Background' } }
+    BoardPatch:
+      type: object
+      minProperties: 1
+      properties: { name: { type: string, minLength: 1, maxLength: 100 }, background: { $ref: '#/components/schemas/Background' } }
+    Member:
+      type: object
+      required: [userId, name, email, role]
+      properties: { userId: { type: string, format: uuid }, name: { type: string }, email: { type: string, format: email }, role: { $ref: '#/components/schemas/Role' } }
+    NameInput:
+      type: object
+      required: [name]
+      properties: { name: { type: string, minLength: 1, maxLength: 100 } }
+    LabelColor:
+      type: string
+      enum: [green, yellow, orange, red, purple, blue, sky, lime, pink, black]
+    Label:
+      type: object
+      required: [id, color, name]
+      properties: { id: { type: string, format: uuid }, color: { $ref: '#/components/schemas/LabelColor' }, name: { type: string, maxLength: 50, description: Có thể rỗng } }
+    LabelInput:
+      type: object
+      required: [color]
+      properties: { color: { $ref: '#/components/schemas/LabelColor' }, name: { type: string, maxLength: 50 } }
+    List:
+      type: object
+      required: [id, boardId, name]
+      properties: { id: { type: string, format: uuid }, boardId: { type: string, format: uuid }, name: { type: string } }
+    CardSummary:
+      type: object
+      required: [id, listId, title, labelIds, memberIds, dueDate, dueComplete, checklistDone, checklistTotal, commentCount]
+      properties:
+        id: { type: string, format: uuid }
+        listId: { type: string, format: uuid }
+        title: { type: string }
+        labelIds: { type: array, items: { type: string, format: uuid } }
+        memberIds: { type: array, items: { type: string, format: uuid } }
+        dueDate: { type: string, format: date-time, nullable: true }
+        dueComplete: { type: boolean }
+        checklistDone: { type: integer }
+        checklistTotal: { type: integer }
+        commentCount: { type: integer }
+        coverUrl: { type: string, nullable: true }
+        coverType: { type: string, enum: [image, video], nullable: true }
+    ListWithCards:
+      allOf:
+        - $ref: '#/components/schemas/List'
+        - type: object
+          required: [cards]
+          properties: { cards: { type: array, items: { $ref: '#/components/schemas/CardSummary' } } }
+    BoardDetail:
+      type: object
+      required: [board, members, labels, lists]
+      properties:
+        board: { $ref: '#/components/schemas/Board' }
+        members: { type: array, items: { $ref: '#/components/schemas/Member' } }
+        labels: { type: array, items: { $ref: '#/components/schemas/Label' } }
+        lists: { type: array, items: { $ref: '#/components/schemas/ListWithCards' } }
+    ChecklistItem:
+      type: object
+      required: [id, checklistId, text, done]
+      properties: { id: { type: string, format: uuid }, checklistId: { type: string, format: uuid }, text: { type: string }, done: { type: boolean } }
+    Checklist:
+      type: object
+      required: [id, cardId, title, items]
+      properties:
+        id: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        title: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/ChecklistItem' } }
+    CommentInput:
+      type: object
+      required: [text]
+      properties: { text: { type: string, minLength: 1, maxLength: 4096 } }
+    Comment:
+      type: object
+      required: [id, cardId, author, text, createdAt, editedAt]
+      properties:
+        id: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        author: { $ref: '#/components/schemas/User' }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        editedAt: { type: string, format: date-time, nullable: true }
+    CardPatch:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        description: { type: string, maxLength: 16384 }
+        dueDate: { type: string, format: date-time, nullable: true }
+        dueComplete: { type: boolean }
+    CardDetail:
+      type: object
+      required: [id, boardId, listId, title, description, archived, labelIds, members, dueDate, dueComplete, checklists, comments]
+      properties:
+        id: { type: string, format: uuid }
+        boardId: { type: string, format: uuid }
+        listId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        archived: { type: boolean }
+        labelIds: { type: array, items: { type: string, format: uuid } }
+        members: { type: array, items: { $ref: '#/components/schemas/Member' } }
+        dueDate: { type: string, format: date-time, nullable: true }
+        dueComplete: { type: boolean }
+        checklists: { type: array, items: { $ref: '#/components/schemas/Checklist' } }
+        comments: { type: array, description: Mới nhất trước, items: { $ref: '#/components/schemas/Comment' } }
+        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
+    Attachment:
+      type: object
+      required: [id, cardId, fileName, fileUrl, fileType, mimeType, isCover, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        fileName: { type: string }
+        fileUrl: { type: string }
+        fileType: { type: string, enum: [image, video] }
+        mimeType: { type: string }
+        size: { type: integer }
+        isCover: { type: boolean }
+        createdAt: { type: string, format: date-time }

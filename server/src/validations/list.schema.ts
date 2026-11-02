@@ -1,0 +1,27 @@
+import { z } from 'zod';
+
+export const createListSchema = z.object({
+  body: z.object({
+    name: z
+      .string({ required_error: 'Tên danh sách là bắt buộc' })
+      .trim()
+      .min(1, 'Tên danh sách không được để trống')
+      .max(100, 'Tên danh sách không được vượt quá 100 ký tự'),
+  }),
+});
+
+export const updateListSchema = z.object({
+  body: z.object({
+    name: z
+      .string({ required_error: 'Tên danh sách là bắt buộc' })
+      .trim()
+      .min(1, 'Tên danh sách không được để trống')
+      .max(100, 'Tên danh sách không được vượt quá 100 ký tự'),
+  }),
+});
+
+export const moveListSchema = z.object({
+  body: z.object({
+    toIndex: z.number({ required_error: 'toIndex là bắt buộc' }).int(),
+  }),
+});
