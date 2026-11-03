@@ -5,6 +5,8 @@ import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/atoms/button';
 import { Input } from '@/components/atoms/input';
 import { Spinner } from '@/components/atoms/spinner';
+import { toast } from 'sonner';
+import { getConflictMessage } from '@/lib/api/client';
 
 interface QuickCardCreatorProps {
   listId: string;
@@ -45,15 +47,15 @@ export function QuickCardCreator({
       if (inputRef.current) {
         inputRef.current.focus();
       }
+    } catch (error) {
+      toast.error(getConflictMessage(error) || 'Không thể thêm thẻ. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit();
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       // Phím Esc huỷ và đóng form (BR-06, TC-03.1-02)
       setTitle('');
       setIsOpen(false);

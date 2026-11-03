@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { ListWithCards } from '@/types/board-detail';
+import { getConflictMessage } from '@/lib/api/client';
 import { moveList, moveCard } from '@/lib/api/board-detail';
 
 interface UseBoardDndProps {
@@ -180,12 +181,12 @@ export function useBoardDnd({ initialLists, onListsChange, disabled = false }: U
     finishDrag(nextLists);
     try {
       await moveCard(id, targetList.id, targetIndex);
-    } catch {
+    } catch (error) {
       settlingListsRef.current = previousLists;
       previewListsRef.current = previousLists;
       setPreviewLists(previousLists);
       onListsChange(previousLists);
-      setMoveError('Không thể di chuyển thẻ. Vui lòng thử lại.');
+      setMoveError(getConflictMessage(error) || 'Không thể di chuyển thẻ. Vui lòng thử lại.');
     }
   };
 

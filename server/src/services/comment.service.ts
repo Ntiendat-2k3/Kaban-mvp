@@ -4,6 +4,8 @@ import {
 } from '../repositories/interfaces/ICommentRepository.js';
 import { IBoardRepository } from '../repositories/interfaces/IBoardRepository.js';
 import { Card, Comment } from '../models/index.js';
+import { emitBoardChanged } from '../realtime/socket.js';
+import { logActivity } from './activity.service.js';
 
 export class CommentService {
   constructor(
@@ -26,7 +28,10 @@ export class CommentService {
       throw error;
     }
 
-    return this.commentRepo.createComment(cardId, userId, text);
+    const created = await this.commentRepo.createComment(cardId, userId, text);
+    await logActivity({ boardId: card.boardId, cardId, userId, type: 'comment.added' });
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId });
+    return created;
   }
 
   async updateComment(
@@ -49,7 +54,10 @@ export class CommentService {
       throw error;
     }
 
-    return this.commentRepo.updateComment(commentId, text);
+    const updated = await this.commentRepo.updateComment(commentId, text);
+    const card = await Card.findByPk(comment.cardId);
+    if (card) emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
+    return updated;
   }
 
   async deleteComment(commentId: string, userId: string): Promise<void> {
@@ -69,5 +77,7 @@ export class CommentService {
     }
 
     await this.commentRepo.deleteComment(commentId);
+    const card = await Card.findByPk(comment.cardId);
+    if (card) emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
   }
 }

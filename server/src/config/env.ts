@@ -7,5 +7,6 @@ export const ENV = {
   JWT_SECRET: process.env.JWT_SECRET || '',
   DATABASE_URL: process.env.DATABASE_URL || '',
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  TRUST_PROXY: process.env.TRUST_PROXY === 'true',
 };
 

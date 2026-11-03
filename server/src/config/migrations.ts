@@ -13,6 +13,28 @@ const migrations = [
       'ALTER TABLE "comments" ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMPTZ NULL',
     ],
   },
+  {
+    name: '20261103_fractional_positions',
+    statements: [
+      'ALTER TABLE "cards" ALTER COLUMN "position" TYPE DOUBLE PRECISION',
+      'ALTER TABLE "lists" ALTER COLUMN "position" TYPE DOUBLE PRECISION',
+    ],
+  },
+  {
+    name: '20261103_list_wip_limit',
+    statements: ['ALTER TABLE "lists" ADD COLUMN IF NOT EXISTS "wipLimit" INTEGER NULL'],
+  },
+  {
+    name: '20261103_list_color',
+    statements: ['ALTER TABLE "lists" ADD COLUMN IF NOT EXISTS "color" VARCHAR(16) NULL'],
+  },
+  {
+    name: '20261103_activity_indexes',
+    statements: [
+      'CREATE INDEX IF NOT EXISTS "activities_board_created_idx" ON "activities" ("boardId", "createdAt" DESC)',
+      'CREATE INDEX IF NOT EXISTS "activities_card_created_idx" ON "activities" ("cardId", "createdAt" DESC)',
+    ],
+  },
 ];
 
 export async function runMigrations(): Promise<void> {

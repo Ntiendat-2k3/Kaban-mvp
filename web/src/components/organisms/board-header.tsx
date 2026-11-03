@@ -8,6 +8,7 @@ import { Board, BoardBackground, BOARD_BACKGROUND_COLORS, BOARD_BACKGROUND_OPTIO
 import { Button } from '@/components/atoms/button';
 import { Input } from '@/components/atoms/input';
 import { BoardMembersDialog } from '@/components/organisms/board-members-dialog';
+import { BoardArchiveDialog } from '@/components/organisms/board-archive-dialog';
 import { cn } from '@/lib/utils';
 
 export interface BoardHeaderProps {
@@ -36,6 +37,7 @@ export function BoardHeader({
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(board.name);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -184,9 +186,8 @@ export function BoardHeader({
             <span>Thành viên</span>
           </Button>
 
-          {/* Menu tuỳ chọn (Đóng bảng - chỉ cho owner, SRS §5) */}
-          {board.role === 'owner' && onArchive && (
-            <DropdownMenu.Root>
+          {/* Menu bảng chứa kho lưu trữ cho thành viên và thao tác đóng bảng cho chủ sở hữu. */}
+          <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
                 <Button
                   variant="ghost"
@@ -204,16 +205,24 @@ export function BoardHeader({
                   className="z-50 min-w-[180px] rounded-md border bg-popover p-1 shadow-md animate-in fade-in-80"
                 >
                   <DropdownMenu.Item
-                    onSelect={onArchive}
-                    className="flex cursor-pointer items-center rounded-sm px-2.5 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10 focus:bg-destructive/10"
+                    onSelect={() => setIsArchiveOpen(true)}
+                    className="flex cursor-pointer items-center rounded-sm px-2.5 py-1.5 text-sm outline-none hover:bg-muted focus:bg-muted"
                   >
                     <Archive className="mr-2 h-4 w-4" />
-                    <span>Đóng bảng</span>
+                    <span>Kho lưu trữ</span>
                   </DropdownMenu.Item>
+                  {board.role === 'owner' && onArchive && (
+                    <DropdownMenu.Item
+                      onSelect={onArchive}
+                      className="flex cursor-pointer items-center rounded-sm px-2.5 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10 focus:bg-destructive/10"
+                    >
+                      <Archive className="mr-2 h-4 w-4" />
+                      <span>Đóng bảng</span>
+                    </DropdownMenu.Item>
+                  )}
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
-            </DropdownMenu.Root>
-          )}
+          </DropdownMenu.Root>
         </div>
       </div>
 
@@ -223,6 +232,7 @@ export function BoardHeader({
         open={isMembersOpen}
         onOpenChange={setIsMembersOpen}
       />
+      <BoardArchiveDialog boardId={board.id} open={isArchiveOpen} onOpenChange={setIsArchiveOpen} />
     </>
   );
 }

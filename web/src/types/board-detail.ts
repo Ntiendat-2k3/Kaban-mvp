@@ -20,6 +20,8 @@ export interface ListWithCards {
   id: string;
   boardId: string;
   name: string;
+  wipLimit: number | null;
+  color: BoardBackground | null;
   cards: CardSummary[];
 }
 

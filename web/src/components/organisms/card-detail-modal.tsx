@@ -130,10 +130,10 @@ export function CardDetailModal({
   return (
     <Dialog.Root open onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-200" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 animate-in fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
         <Dialog.Content
           onEscapeKeyDown={handleClose}
-          className="fixed left-[50%] top-[50%] z-50 flex max-h-[90vh] w-[95vw] max-w-3xl translate-x-[-50%] translate-y-[-50%] flex-col rounded-xl border bg-background shadow-2xl duration-200 overflow-hidden outline-none animate-in fade-in-0 zoom-in-95"
+          className="fixed left-[50%] top-[50%] z-50 flex max-h-[90vh] w-[95vw] max-w-3xl translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl outline-none animate-in fade-in-0 zoom-in-95 duration-150 ease-out motion-reduce:animate-none"
         >
           {/* Banner Thẻ đã được lưu trữ (SRS §8, BR-08, TC-03.1-05, TC-03.1-06) */}
           {card.archived && (

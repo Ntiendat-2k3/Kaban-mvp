@@ -1,6 +1,7 @@
 import { ILabelRepository, LabelEntity } from '../repositories/interfaces/ILabelRepository.js';
 import { IBoardRepository } from '../repositories/interfaces/IBoardRepository.js';
 import { Card, Label } from '../models/index.js';
+import { emitBoardChanged } from '../realtime/socket.js';
 
 export class LabelService {
   constructor(
@@ -21,7 +22,9 @@ export class LabelService {
       throw error;
     }
 
-    return this.labelRepo.createLabel(boardId, color, name);
+    const result = await this.labelRepo.createLabel(boardId, color, name);
+    emitBoardChanged(boardId, { type: 'board.updated', actorId: userId });
+    return result;
   }
 
   async updateLabel(
@@ -43,7 +46,9 @@ export class LabelService {
       throw error;
     }
 
-    return this.labelRepo.updateLabel(labelId, patch);
+    const result = await this.labelRepo.updateLabel(labelId, patch);
+    emitBoardChanged(label.boardId, { type: 'board.updated', actorId: userId });
+    return result;
   }
 
   async deleteLabel(labelId: string, userId: string): Promise<void> {
@@ -62,6 +67,7 @@ export class LabelService {
     }
 
     await this.labelRepo.deleteLabel(labelId);
+    emitBoardChanged(label.boardId, { type: 'board.updated', actorId: userId });
   }
 
   async addCardLabel(cardId: string, labelId: string, userId: string): Promise<void> {
@@ -87,6 +93,7 @@ export class LabelService {
     }
 
     await this.labelRepo.addCardLabel(cardId, labelId);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
   }
 
   async removeCardLabel(cardId: string, labelId: string, userId: string): Promise<void> {
@@ -105,5 +112,6 @@ export class LabelService {
     }
 
     await this.labelRepo.removeCardLabel(cardId, labelId);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
   }
 }

@@ -26,6 +26,8 @@ cardRouter.post(
 
 cardRouter.post('/cards/:cardId/duplicate', authMiddleware, CardController.duplicateCard);
 
+cardRouter.get('/boards/:boardId/archived-cards', authMiddleware, CardController.getArchivedCards);
+
 cardRouter.get('/cards/:cardId', authMiddleware, CardController.getCard);
 
 cardRouter.patch(
@@ -36,6 +38,8 @@ cardRouter.patch(
 );
 
 cardRouter.post('/cards/:cardId/archive', authMiddleware, CardController.archiveCard);
+
+cardRouter.delete('/cards/:cardId', authMiddleware, CardController.deleteCard);
 
 cardRouter.post('/cards/:cardId/restore', authMiddleware, CardController.restoreCard);
 

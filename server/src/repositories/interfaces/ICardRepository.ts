@@ -53,6 +53,14 @@ export interface CardDetailEntity {
   }>;
 }
 
+export interface ArchivedCardEntity {
+  id: string;
+  title: string;
+  listId: string;
+  listName: string;
+  listArchived: boolean;
+}
+
 export interface ICardRepository {
   createCard(listId: string, title: string): Promise<CardSummaryEntity>;
   duplicateCard(cardId: string): Promise<CardSummaryEntity>;
@@ -68,5 +76,7 @@ export interface ICardRepository {
     }
   ): Promise<CardDetailEntity>;
   archiveCard(cardId: string): Promise<void>;
+  getArchivedCards(boardId: string): Promise<ArchivedCardEntity[]>;
+  deleteCard(cardId: string): Promise<Array<{ publicId: string; fileType: 'image' | 'video' }> | null>;
   restoreCard(cardId: string): Promise<CardSummaryEntity>;
 }

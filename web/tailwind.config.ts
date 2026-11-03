@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        // Cấu hình font Be Vietnam Pro làm font sans mặc định
+        // Ưu tiên font Be Vietnam Pro lưu tại dự án; dùng font hệ thống trong lúc tải.
         sans: ["'Be Vietnam Pro'", 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       fontSize: {

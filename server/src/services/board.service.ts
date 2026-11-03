@@ -6,6 +6,7 @@ import {
 } from '../repositories/interfaces/IBoardRepository.js';
 import { IUserRepository } from '../repositories/interfaces/IUserRepository.js';
 import { Label, User } from '../models/index.js';
+import { emitBoardChanged, removeBoardMemberSocket } from '../realtime/socket.js';
 
 export class BoardService {
   constructor(
@@ -92,6 +93,7 @@ export class BoardService {
 
     // Gán role chính xác của caller
     updated.role = role;
+    emitBoardChanged(boardId, { type: 'board.updated', actorId: userId });
     return updated;
   }
 
@@ -211,6 +213,7 @@ export class BoardService {
 
     // 3. Thêm vào bảng
     await this.boardRepo.addMember(boardId, targetUser.id, 'member');
+    emitBoardChanged(boardId, { type: 'board.updated', actorId: callerUserId });
 
     return {
       userId: targetUser.id,
@@ -243,12 +246,16 @@ export class BoardService {
         throw error;
       }
       await this.boardRepo.removeMember(boardId, targetUserId);
+      await removeBoardMemberSocket(boardId, targetUserId);
+      emitBoardChanged(boardId, { type: 'board.updated', actorId: callerUserId });
       return;
     }
 
     // Trường hợp 2: Member tự rời bảng
     if (callerUserId === targetUserId) {
       await this.boardRepo.removeMember(boardId, targetUserId);
+      await removeBoardMemberSocket(boardId, targetUserId);
+      emitBoardChanged(boardId, { type: 'board.updated', actorId: callerUserId });
       return;
     }
 

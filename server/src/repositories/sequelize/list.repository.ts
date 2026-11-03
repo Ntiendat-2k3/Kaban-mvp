@@ -1,5 +1,9 @@
-import { IListRepository, ListEntity } from '../interfaces/IListRepository.js';
+import { IListRepository, ListEntity, ArchivedListEntity } from '../interfaces/IListRepository.js';
 import { List } from '../../models/index.js';
+import { Op } from 'sequelize';
+import { sequelize } from '../../config/database.js';
+import { computePosition, POSITION_STEP } from '../../utils/position.js';
+import type { BoardBackground } from '../interfaces/IBoardRepository.js';
 
 export class SequelizeListRepository implements IListRepository {
   async createList(boardId: string, name: string): Promise<ListEntity> {
@@ -24,14 +28,18 @@ export class SequelizeListRepository implements IListRepository {
       name: list.title,
       position: list.position,
       isArchived: list.isArchived,
+      wipLimit: list.wipLimit,
+      color: list.color as BoardBackground | null,
     };
   }
 
-  async updateList(listId: string, name: string): Promise<ListEntity | null> {
+  async updateList(listId: string, patch: { name?: string; wipLimit?: number | null; color?: BoardBackground | null }): Promise<ListEntity | null> {
     const list = await List.findByPk(listId);
     if (!list) return null;
 
-    list.title = name;
+    if (patch.name !== undefined) list.title = patch.name;
+    if (patch.wipLimit !== undefined) list.wipLimit = patch.wipLimit;
+    if (patch.color !== undefined) list.color = patch.color;
     await list.save();
 
     return {
@@ -40,6 +48,8 @@ export class SequelizeListRepository implements IListRepository {
       name: list.title,
       position: list.position,
       isArchived: list.isArchived,
+      wipLimit: list.wipLimit,
+      color: list.color as BoardBackground | null,
     };
   }
 
@@ -52,34 +62,59 @@ export class SequelizeListRepository implements IListRepository {
     return true;
   }
 
-  async moveList(listId: string, toIndex: number): Promise<boolean> {
-    const target = await List.findByPk(listId);
-    if (!target) return false;
-
-    // Lấy tất cả list đang hoạt động của bảng theo thứ tự position
+  async getArchivedLists(boardId: string): Promise<ArchivedListEntity[]> {
     const lists = await List.findAll({
-      where: { boardId: target.boardId, isArchived: false },
-      order: [['position', 'ASC']],
+      attributes: ['id', 'title'],
+      where: { boardId, isArchived: true },
+      order: [['updatedAt', 'DESC']],
     });
+    return lists.map((list) => ({ id: list.id, name: list.title }));
+  }
 
-    if (lists.length === 0) return false;
+  /** Khôi phục danh sách ở cuối bảng để tránh trùng vị trí với các cột đang hiển thị. */
+  async restoreList(listId: string): Promise<ListEntity | null> {
+    return sequelize.transaction(async (transaction) => {
+      const list = await List.findByPk(listId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!list || !list.isArchived) return null;
+      const lastList = await List.findOne({
+        where: { boardId: list.boardId, isArchived: false },
+        order: [['position', 'DESC']],
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      await list.update({ isArchived: false, position: lastList ? lastList.position + POSITION_STEP : POSITION_STEP }, { transaction });
+      return {
+        id: list.id,
+        boardId: list.boardId,
+        name: list.title,
+        position: list.position,
+        isArchived: list.isArchived,
+        wipLimit: list.wipLimit,
+        color: list.color as BoardBackground | null,
+      };
+    });
+  }
 
-    // Kẹp toIndex trong khoảng [0, lists.length - 1] theo OpenAPI spec
-    const clampedIndex = Math.max(0, Math.min(toIndex, lists.length - 1));
-
-    // Loại bỏ list hiện tại và chèn vào clampedIndex
-    const remaining = lists.filter((l) => l.id !== listId);
-    remaining.splice(clampedIndex, 0, target);
-
-    // Cập nhật lại position cho tất cả các list
-    await Promise.all(
-      remaining.map((l, idx) => {
-        l.position = (idx + 1) * 65535;
-        return l.save();
-      })
-    );
-
-    return true;
+  async moveList(listId: string, toIndex: number): Promise<boolean> {
+    return sequelize.transaction(async (transaction) => {
+      const target = await List.findByPk(listId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!target) return false;
+      const siblings = await List.findAll({
+        where: { boardId: target.boardId, isArchived: false, id: { [Op.ne]: listId } },
+        order: [['position', 'ASC']], transaction, lock: transaction.LOCK.UPDATE,
+      });
+      const index = Math.max(0, Math.min(toIndex, siblings.length));
+      const { position, needsRebalance } = computePosition(siblings[index - 1]?.position, siblings[index]?.position);
+      if (!needsRebalance) {
+        await target.update({ position }, { transaction });
+        return true;
+      }
+      siblings.splice(index, 0, target);
+      for (const [i, sibling] of siblings.entries()) {
+        await sibling.update({ position: (i + 1) * POSITION_STEP }, { transaction });
+      }
+      return true;
+    });
   }
 
   async getBoardLists(boardId: string): Promise<ListEntity[]> {
@@ -94,6 +129,8 @@ export class SequelizeListRepository implements IListRepository {
       name: l.title,
       position: l.position,
       isArchived: l.isArchived,
+      wipLimit: l.wipLimit,
+      color: l.color as BoardBackground | null,
     }));
   }
 }

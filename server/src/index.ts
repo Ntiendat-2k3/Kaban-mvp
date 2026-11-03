@@ -3,6 +3,8 @@ import { ENV } from './config/env.js';
 import { connectDatabase } from './config/database.js';
 import { syncDatabase } from './models/index.js';
 import { runMigrations } from './config/migrations.js';
+import { createServer } from 'http';
+import { initSocket } from './realtime/socket.js';
 
 async function bootstrap() {
   if (!ENV.JWT_SECRET || !ENV.DATABASE_URL) {
@@ -12,7 +14,9 @@ async function bootstrap() {
   await syncDatabase(false);
   await runMigrations();
 
-  app.listen(ENV.PORT, () => {
+  const httpServer = createServer(app);
+  initSocket(httpServer);
+  httpServer.listen(ENV.PORT, () => {
     console.log(`🚀 Kaban Server đang chạy tại http://localhost:${ENV.PORT}`);
     console.log(`📡 API tiền tố: http://localhost:${ENV.PORT}/api`);
   });

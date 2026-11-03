@@ -19,7 +19,7 @@ export class CardController {
       const card = await cardService.createCard(listId, userId, title);
       res.status(201).json(card);
     } catch (error: any) {
-      ResponseView.error(res, error.message || 'Lỗi tạo thẻ', error.statusCode || 400);
+      error.code ? ResponseView.error(res, error.code, error.message || 'Lỗi tạo thẻ', error.statusCode || 400) : ResponseView.error(res, error.message || 'Lỗi tạo thẻ', error.statusCode || 400);
     }
   }
 
@@ -28,7 +28,7 @@ export class CardController {
       const card = await cardService.duplicateCard(req.params.cardId, (req as any).user?.id);
       res.status(201).json(card);
     } catch (error: any) {
-      ResponseView.error(res, error.message || 'Lỗi nhân bản thẻ', error.statusCode || 400);
+      error.code ? ResponseView.error(res, error.code, error.message || 'Lỗi nhân bản thẻ', error.statusCode || 400) : ResponseView.error(res, error.message || 'Lỗi nhân bản thẻ', error.statusCode || 400);
     }
   }
 
@@ -41,7 +41,7 @@ export class CardController {
       await cardService.moveCard(cardId, userId, toListId, toIndex);
       res.status(204).send();
     } catch (error: any) {
-      ResponseView.error(res, error.message || 'Lỗi di chuyển thẻ', error.statusCode || 400);
+      error.code ? ResponseView.error(res, error.code, error.message || 'Lỗi di chuyển thẻ', error.statusCode || 400) : ResponseView.error(res, error.message || 'Lỗi di chuyển thẻ', error.statusCode || 400);
     }
   }
 
@@ -105,6 +105,26 @@ export class CardController {
       res.status(204).send();
     } catch (error: any) {
       ResponseView.error(res, error.message || 'Lỗi lưu trữ thẻ', error.statusCode || 400);
+    }
+  }
+
+  static async getArchivedCards(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      const cards = await cardService.getArchivedCards(req.params.boardId, userId);
+      res.status(200).json(cards);
+    } catch (error: any) {
+      ResponseView.error(res, error.message || 'Lỗi tải thẻ đã lưu trữ', error.statusCode || 500);
+    }
+  }
+
+  static async deleteCard(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      await cardService.deleteCard(req.params.cardId, userId);
+      res.status(204).send();
+    } catch (error: any) {
+      ResponseView.error(res, error.message || 'Lỗi xóa thẻ', error.statusCode || 400);
     }
   }
 

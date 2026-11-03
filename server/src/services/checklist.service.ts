@@ -5,6 +5,7 @@ import {
 } from '../repositories/interfaces/IChecklistRepository.js';
 import { IBoardRepository } from '../repositories/interfaces/IBoardRepository.js';
 import { Card, Checklist, ChecklistItem } from '../models/index.js';
+import { emitBoardChanged } from '../realtime/socket.js';
 
 export class ChecklistService {
   constructor(
@@ -27,7 +28,9 @@ export class ChecklistService {
       throw error;
     }
 
-    return this.checklistRepo.createChecklist(cardId, title);
+    const result = await this.checklistRepo.createChecklist(cardId, title);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
+    return result;
   }
 
   async deleteChecklist(checklistId: string, userId: string): Promise<void> {
@@ -53,6 +56,7 @@ export class ChecklistService {
     }
 
     await this.checklistRepo.deleteChecklist(checklistId);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
   }
 
   async createChecklistItem(
@@ -81,7 +85,9 @@ export class ChecklistService {
       throw error;
     }
 
-    return this.checklistRepo.createChecklistItem(checklistId, text);
+    const result = await this.checklistRepo.createChecklistItem(checklistId, text);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
+    return result;
   }
 
   async updateChecklistItem(
@@ -117,7 +123,9 @@ export class ChecklistService {
       throw error;
     }
 
-    return this.checklistRepo.updateChecklistItem(itemId, patch);
+    const result = await this.checklistRepo.updateChecklistItem(itemId, patch);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
+    return result;
   }
 
   async deleteChecklistItem(itemId: string, userId: string): Promise<void> {
@@ -150,5 +158,6 @@ export class ChecklistService {
     }
 
     await this.checklistRepo.deleteChecklistItem(itemId);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId: card.id });
   }
 }

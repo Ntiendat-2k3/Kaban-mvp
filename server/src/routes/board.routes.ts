@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { BoardController } from '../controllers/board.controller.js';
+import { ActivityController } from '../controllers/activity.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
 import {
@@ -19,6 +20,7 @@ boardRouter.post(
   BoardController.createBoard
 );
 boardRouter.get('/boards/:boardId', authMiddleware, BoardController.getBoardDetail);
+boardRouter.get('/boards/:boardId/activities', authMiddleware, ActivityController.getBoardActivities);
 boardRouter.patch(
   '/boards/:boardId',
   authMiddleware,

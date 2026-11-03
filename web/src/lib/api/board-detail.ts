@@ -1,5 +1,20 @@
 import { apiClient } from './client';
 import { ListWithCards, CardSummary } from '@/types/board-detail';
+import { BoardBackground } from '@/types/board';
+import type { components } from '@/types/api';
+
+export type ArchivedList = components['schemas']['ArchivedList'];
+
+/** Đọc các danh sách đã lưu trữ của bảng. */
+export async function getArchivedLists(boardId: string): Promise<ArchivedList[]> {
+  const response = await apiClient.get<ArchivedList[]>(`/boards/${boardId}/archived-lists`);
+  return response.data;
+}
+
+/** Khôi phục danh sách đã lưu trữ về cuối bảng. */
+export async function restoreList(listId: string): Promise<void> {
+  await apiClient.post(`/lists/${listId}/restore`);
+}
 
 /**
  * Thêm danh sách mới vào cuối bảng (API-02, BR-03)
@@ -12,8 +27,8 @@ export async function createList(boardId: string, name: string): Promise<ListWit
 /**
  * Đổi tên danh sách (API-03, BR-04)
  */
-export async function updateList(listId: string, name: string): Promise<ListWithCards> {
-  const response = await apiClient.patch<ListWithCards>(`/lists/${listId}`, { name });
+export async function updateList(listId: string, patch: { name?: string; wipLimit?: number | null; color?: BoardBackground | null }): Promise<ListWithCards> {
+  const response = await apiClient.patch<ListWithCards>(`/lists/${listId}`, patch);
   return response.data;
 }
 

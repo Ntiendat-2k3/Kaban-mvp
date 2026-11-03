@@ -182,6 +182,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/boards/{boardId}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: components["parameters"]["BoardId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getBoardActivities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{boardId}/archived-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: components["parameters"]["BoardId"];
+            };
+            cookie?: never;
+        };
+        /** @description Liệt kê thẻ đã lưu trữ của bảng cho thành viên. */
+        get: operations["getArchivedCards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{boardId}/archived-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: components["parameters"]["BoardId"];
+            };
+            cookie?: never;
+        };
+        /** @description Liệt kê danh sách đã lưu trữ của bảng cho thành viên. */
+        get: operations["getArchivedLists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/boards/{boardId}/lists": {
         parameters: {
             query?: never;
@@ -256,6 +312,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/lists/{listId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: components["parameters"]["ListId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Khôi phục danh sách về cuối bảng cùng các thẻ chưa lưu trữ bên trong. */
+        post: operations["restoreList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lists/{listId}/cards": {
         parameters: {
             query?: never;
@@ -288,7 +363,8 @@ export interface paths {
         get: operations["getCard"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** @description Xóa vĩnh viễn thẻ và dữ liệu liên quan; không thể khôi phục. */
+        delete: operations["deleteCard"];
         options?: never;
         head?: never;
         /** @description dueDate nullable; gửi null để xoá hạn (khi đó dueComplete tự về false). */
@@ -719,6 +795,44 @@ export interface components {
             /** Format: uuid */
             boardId: string;
             name: string;
+            wipLimit?: number | null;
+            /** @enum {string|null} */
+            color?: "blue" | "orange" | "green" | "red" | "purple" | "pink" | "lime" | "sky" | null;
+        };
+        ArchivedList: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        Activity: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            boardId: string;
+            /** Format: uuid */
+            cardId: string | null;
+            /** Format: uuid */
+            userId: string;
+            type: string;
+            data: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+        };
+        ArchivedCard: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: uuid */
+            listId: string;
+            listName: string;
+            listArchived: boolean;
         };
         CardSummary: {
             /** Format: uuid */
@@ -1223,6 +1337,79 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getBoardActivities: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before?: string;
+            };
+            header?: never;
+            path: {
+                boardId: components["parameters"]["BoardId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activity"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Validation"];
+        };
+    };
+    getArchivedCards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: components["parameters"]["BoardId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách thẻ đã lưu trữ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivedCard"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getArchivedLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: components["parameters"]["BoardId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách cột đã lưu trữ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivedList"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
     createList: {
         parameters: {
             query?: never;
@@ -1262,7 +1449,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NameInput"];
+                "application/json": {
+                    name?: string;
+                    wipLimit?: number | null;
+                    /** @enum {string|null} */
+                    color?: "blue" | "orange" | "green" | "red" | "purple" | "pink" | "lime" | "sky" | null;
+                };
             };
         };
         responses: {
@@ -1330,6 +1522,29 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    restoreList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: components["parameters"]["ListId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã khôi phục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
     createCard: {
         parameters: {
             query?: never;
@@ -1357,6 +1572,13 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            /** @description Giới hạn WIP của cột đã đạt */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             422: components["responses"]["Validation"];
         };
     };
@@ -1379,6 +1601,27 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CardDetail"];
                 };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cardId: components["parameters"]["CardId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xóa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             404: components["responses"]["NotFound"];
         };
@@ -1440,6 +1683,13 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            /** @description Giới hạn WIP của cột đích đã đạt */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             422: components["responses"]["Validation"];
         };
     };
@@ -1464,6 +1714,13 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            /** @description Giới hạn WIP của cột đã đạt */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     archiveCard: {

@@ -27,7 +27,7 @@ import {
   createCard,
   duplicateCard,
 } from '@/lib/api/board-detail';
-import { archiveCard } from '@/lib/api/card-detail';
+import { deleteCard, updateCard } from '@/lib/api/card-detail';
 import { useBoardFilter } from '@/hooks/use-board-filter';
 import { BoardBackground, BOARD_BACKGROUND_COLORS, BoardMember } from '@/types/board';
 import { BoardDetail, BoardLabel } from '@/types/board-detail';
@@ -161,7 +161,7 @@ export default function BoardDetailPage({ params }: { params: { boardId: string 
 
   const updateListMutation = useMutation({
     mutationFn: ({ listId, name }: { listId: string; name: string }) =>
-      updateList(listId, name),
+      updateList(listId, { name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
     },
@@ -172,6 +172,18 @@ export default function BoardDetailPage({ params }: { params: { boardId: string 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
     },
+  });
+
+  const updateWipMutation = useMutation({
+    mutationFn: ({ listId, wipLimit }: { listId: string; wipLimit: number | null }) => updateList(listId, { wipLimit }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board', boardId] }),
+    onError: () => toast.error('Không thể cập nhật giới hạn thẻ.'),
+  });
+
+  const updateListColorMutation = useMutation({
+    mutationFn: ({ listId, color }: { listId: string; color: BoardBackground | null }) => updateList(listId, { color }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board', boardId] }),
+    onError: () => toast.error('Không thể đổi màu cột.'),
   });
 
   // Mutation tạo thẻ nhanh (SRS §5, BR-06, API-06)
@@ -291,6 +303,8 @@ export default function BoardDetailPage({ params }: { params: { boardId: string 
             onUpdateListTitle={(listId, name) => {
               updateListMutation.mutate({ listId, name });
             }}
+            onUpdateListWipLimit={(listId, wipLimit) => updateWipMutation.mutate({ listId, wipLimit })}
+            onUpdateListColor={(listId, color) => updateListColorMutation.mutate({ listId, color })}
             onArchiveList={(listId) => {
               archiveListMutation.mutate(listId);
             }}
@@ -311,8 +325,19 @@ export default function BoardDetailPage({ params }: { params: { boardId: string 
               }));
               queryClient.invalidateQueries({ queryKey: ['board', boardId] });
             }}
-            onArchiveCard={async (cardId) => {
-              await archiveCard(cardId);
+            onRenameCard={async (cardId, title) => {
+              await updateCard(cardId, { title });
+              queryClient.setQueryData<BoardDetail>(['board', boardId], (current) => current && ({
+                ...current,
+                lists: current.lists.map((list) => ({
+                  ...list,
+                  cards: list.cards.map((card) => card.id === cardId ? { ...card, title } : card),
+                })),
+              }));
+              queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+            }}
+            onDeleteCard={async (cardId) => {
+              await deleteCard(cardId);
               queryClient.setQueryData<BoardDetail>(['board', boardId], (current) => current && ({
                 ...current,
                 lists: current.lists.map((list) => ({

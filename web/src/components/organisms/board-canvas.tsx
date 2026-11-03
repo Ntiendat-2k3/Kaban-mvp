@@ -27,6 +27,9 @@ import { CardActionsMenu } from '@/components/molecules/card-actions-menu';
 import { Button } from '@/components/atoms/button';
 import { Input } from '@/components/atoms/input';
 import { useBoardDnd } from '@/hooks/use-board-dnd';
+import { useBoardRealtime } from '@/hooks/use-board-realtime';
+import { useAuthStore } from '@/lib/store/use-auth-store';
+import { BoardBackground } from '@/types/board';
 import { cn } from '@/lib/utils';
 
 export interface BoardCanvasProps {
@@ -37,10 +40,13 @@ export interface BoardCanvasProps {
   onListsChange?: (lists: ListWithCards[]) => void;
   onCreateList: (name: string) => Promise<void>;
   onUpdateListTitle: (listId: string, name: string) => void;
+  onUpdateListWipLimit?: (listId: string, wipLimit: number | null) => void;
+  onUpdateListColor?: (listId: string, color: BoardBackground | null) => void;
   onArchiveList: (listId: string) => void;
   onQuickCreateCard?: (listId: string, title: string) => Promise<void>;
   onDuplicateCard?: (cardId: string) => Promise<void>;
-  onArchiveCard?: (cardId: string) => Promise<void>;
+  onRenameCard?: (cardId: string, title: string) => Promise<void>;
+  onDeleteCard?: (cardId: string) => Promise<void>;
   childrenRenderer?: (list: ListWithCards) => React.ReactNode;
   footerRenderer?: (list: ListWithCards) => React.ReactNode;
   isFilterActive?: boolean;
@@ -56,7 +62,8 @@ function SortableCardItem({
   membersMap,
   disabled,
   onDuplicateCard,
-  onArchiveCard,
+  onRenameCard,
+  onDeleteCard,
 }: {
   card: CardSummary;
   boardId: string;
@@ -64,7 +71,8 @@ function SortableCardItem({
   membersMap?: Map<string, BoardMember>;
   disabled?: boolean;
   onDuplicateCard?: (cardId: string) => Promise<void>;
-  onArchiveCard?: (cardId: string) => Promise<void>;
+  onRenameCard?: (cardId: string, title: string) => Promise<void>;
+  onDeleteCard?: (cardId: string) => Promise<void>;
 }) {
   const {
     attributes,
@@ -87,11 +95,7 @@ function SortableCardItem({
     transition,
   };
 
-  const tile = (
-    <CardTile card={card} boardId={boardId} labelsMap={labelsMap} membersMap={membersMap} />
-  );
-
-  const item = (
+  const renderItem = (titleEditor: React.ReactNode | null, editingMinHeight?: number) => (
     <div
       ref={setNodeRef}
       style={style}
@@ -100,22 +104,30 @@ function SortableCardItem({
       {...listeners}
     >
       <div className={cn('transition-opacity duration-150', isDragging && 'pointer-events-none opacity-0')}>
-        {tile}
+        <CardTile
+          card={card}
+          boardId={boardId}
+          labelsMap={labelsMap}
+          membersMap={membersMap}
+          titleEditor={titleEditor}
+          editingMinHeight={editingMinHeight}
+        />
       </div>
     </div>
   );
 
-  return onDuplicateCard && onArchiveCard ? (
+  return onDuplicateCard && onDeleteCard ? (
     <CardActionsMenu
       card={card}
       boardId={boardId}
       disabled={isDragging}
       onDuplicate={onDuplicateCard}
-      onArchive={onArchiveCard}
+      onRename={onRenameCard}
+      onDelete={onDeleteCard}
     >
-      {item}
+      {renderItem}
     </CardActionsMenu>
-  ) : item;
+  ) : renderItem(null);
 }
 
 /**
@@ -130,10 +142,13 @@ export function BoardCanvas({
   onListsChange,
   onCreateList,
   onUpdateListTitle,
+  onUpdateListWipLimit,
+  onUpdateListColor,
   onArchiveList,
   onQuickCreateCard,
   onDuplicateCard,
-  onArchiveCard,
+  onRenameCard,
+  onDeleteCard,
   childrenRenderer,
   footerRenderer,
   isFilterActive = false,
@@ -161,6 +176,8 @@ export function BoardCanvas({
     onListsChange: onListsChange || (() => {}),
     disabled: isFilterActive,
   });
+  const myUserId = useAuthStore((state) => state.user?.id);
+  useBoardRealtime(boardId, myUserId, activeId !== null);
 
   useEffect(() => {
     if (isAddingList && addInputRef.current) {
@@ -282,6 +299,8 @@ export function BoardCanvas({
               key={list.id}
               list={list}
               onUpdateTitle={onUpdateListTitle}
+              onUpdateWipLimit={onUpdateListWipLimit}
+              onUpdateColor={onUpdateListColor}
               onArchiveList={onArchiveList}
               disabled={isFilterActive}
               onQuickCreateCard={
@@ -307,7 +326,8 @@ export function BoardCanvas({
                       membersMap={membersMap}
                       disabled={isFilterActive}
                       onDuplicateCard={onDuplicateCard}
-                      onArchiveCard={onArchiveCard}
+                      onRenameCard={onRenameCard}
+                      onDeleteCard={onDeleteCard}
                     />
                   ))}
                 </SortableContext>

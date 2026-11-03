@@ -26,9 +26,9 @@ export class ListController {
     try {
       const userId = (req as any).user?.id;
       const { listId } = req.params;
-      const { name } = req.body;
+      const { name, wipLimit, color } = req.body;
 
-      const updated = await listService.updateList(listId, userId, name);
+      const updated = await listService.updateList(listId, userId, { name, wipLimit, color });
       res.status(200).json(updated);
     } catch (error: any) {
       ResponseView.error(res, error.message || 'Lỗi sửa danh sách', error.statusCode || 400);
@@ -44,6 +44,26 @@ export class ListController {
       res.status(204).send();
     } catch (error: any) {
       ResponseView.error(res, error.message || 'Lỗi lưu trữ danh sách', error.statusCode || 400);
+    }
+  }
+
+  static async getArchivedLists(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      const lists = await listService.getArchivedLists(req.params.boardId, userId);
+      res.status(200).json(lists);
+    } catch (error: any) {
+      ResponseView.error(res, error.message || 'Lỗi tải danh sách đã lưu trữ', error.statusCode || 500);
+    }
+  }
+
+  static async restoreList(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      const list = await listService.restoreList(req.params.listId, userId);
+      res.status(200).json(list);
+    } catch (error: any) {
+      ResponseView.error(res, error.message || 'Lỗi khôi phục danh sách', error.statusCode || 400);
     }
   }
 

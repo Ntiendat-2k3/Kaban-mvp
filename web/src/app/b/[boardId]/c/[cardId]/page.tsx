@@ -289,7 +289,7 @@ export default function CardModalPage({
     return (
       <Dialog.Root open onOpenChange={(open) => !open && handleClose()}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
           <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[90vw] max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border bg-background p-6 shadow-2xl">
             <div className="flex flex-col items-center text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive mb-3">
@@ -320,7 +320,7 @@ export default function CardModalPage({
     return (
       <Dialog.Root open onOpenChange={(open) => !open && handleClose()}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
           <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[95vw] max-w-3xl translate-x-[-50%] translate-y-[-50%] rounded-xl border bg-background p-6 shadow-2xl">
             <div className="space-y-4">
               <Skeleton className="h-8 w-2/3" />

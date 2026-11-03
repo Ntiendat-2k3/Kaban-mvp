@@ -106,14 +106,18 @@ export class List extends Model {
   declare title: string;
   declare position: number;
   declare isArchived: boolean;
+  declare wipLimit: number | null;
+  declare color: string | null;
 }
 List.init(
   {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     boardId: { type: DataTypes.UUID, allowNull: false },
     title: { type: DataTypes.STRING, allowNull: false },
-    position: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 65535 },
+    position: { type: DataTypes.DOUBLE, allowNull: false, defaultValue: 65535 },
     isArchived: { type: DataTypes.BOOLEAN, defaultValue: false },
+    wipLimit: { type: DataTypes.INTEGER, allowNull: true },
+    color: { type: DataTypes.STRING(16), allowNull: true },
   },
   { sequelize, modelName: 'List', tableName: 'lists', timestamps: true }
 );
@@ -137,7 +141,7 @@ Card.init(
     boardId: { type: DataTypes.UUID, allowNull: false },
     title: { type: DataTypes.STRING, allowNull: false },
     description: { type: DataTypes.TEXT, allowNull: true },
-    position: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 65535 },
+    position: { type: DataTypes.DOUBLE, allowNull: false, defaultValue: 65535 },
     isArchived: { type: DataTypes.BOOLEAN, defaultValue: false },
     dueDate: { type: DataTypes.DATE, allowNull: true },
     dueComplete: { type: DataTypes.BOOLEAN, defaultValue: false },
@@ -322,6 +326,25 @@ Attachment.init(
 );
 
 // ================= RELATIONSHIPS =================
+export class Activity extends Model {
+  declare id: string;
+  declare boardId: string;
+  declare cardId: string | null;
+  declare userId: string;
+  declare type: string;
+  declare data: Record<string, unknown>;
+  declare readonly createdAt: Date;
+}
+Activity.init({
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  boardId: { type: DataTypes.UUID, allowNull: false },
+  cardId: { type: DataTypes.UUID, allowNull: true },
+  userId: { type: DataTypes.UUID, allowNull: false },
+  type: { type: DataTypes.STRING(50), allowNull: false },
+  data: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+}, { sequelize, modelName: 'Activity', tableName: 'activities', timestamps: true, updatedAt: false });
+Activity.belongsTo(User, { foreignKey: 'userId', as: 'actor' });
+
 User.hasMany(Board, { foreignKey: 'ownerId', as: 'ownedBoards' });
 Board.belongsTo(User, { foreignKey: 'ownerId', as: 'owner' });
 

@@ -147,6 +147,36 @@ paths:
         '204': { description: "Đã xoá, gỡ luôn khỏi các card của bảng" }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/activities:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    get:
+      tags: [Boards]
+      operationId: getBoardActivities
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+        - { name: before, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200': { description: Nhật ký mới nhất trước, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Activity' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+  /boards/{boardId}/archived-cards:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    get:
+      tags: [Cards]
+      operationId: getArchivedCards
+      description: Liệt kê thẻ đã lưu trữ của bảng cho thành viên.
+      responses:
+        '200': { description: Danh sách thẻ đã lưu trữ, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ArchivedCard' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /boards/{boardId}/archived-lists:
+    parameters: [ { $ref: '#/components/parameters/BoardId' } ]
+    get:
+      tags: [Lists]
+      operationId: getArchivedLists
+      description: Liệt kê danh sách đã lưu trữ của bảng cho thành viên.
+      responses:
+        '200': { description: Danh sách cột đã lưu trữ, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ArchivedList' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
   /boards/{boardId}/lists:
     parameters: [ { $ref: '#/components/parameters/BoardId' } ]
     post:
@@ -163,7 +193,7 @@ paths:
     patch:
       tags: [Lists]
       operationId: updateList
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NameInput' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, minProperties: 1, properties: { name: { type: string, minLength: 1, maxLength: 100 }, wipLimit: { type: integer, minimum: 1, nullable: true }, color: { type: string, enum: [blue, orange, green, red, purple, pink, lime, sky], nullable: true } } } } } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -187,6 +217,15 @@ paths:
       responses:
         '204': { description: Đã lưu trữ list (cards bên trong cũng ẩn theo) }
         '404': { $ref: '#/components/responses/NotFound' }
+  /lists/{listId}/restore:
+    parameters: [ { $ref: '#/components/parameters/ListId' } ]
+    post:
+      tags: [Lists]
+      operationId: restoreList
+      description: Khôi phục danh sách về cuối bảng cùng các thẻ chưa lưu trữ bên trong.
+      responses:
+        '200': { description: Đã khôi phục, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
   /lists/{listId}/cards:
     parameters: [ { $ref: '#/components/parameters/ListId' } ]
     post:
@@ -197,6 +236,7 @@ paths:
       responses:
         '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Giới hạn WIP của cột đã đạt }
         '422': { $ref: '#/components/responses/Validation' }
   /cards/{cardId}:
     parameters: [ { $ref: '#/components/parameters/CardId' } ]
@@ -216,6 +256,13 @@ paths:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardDetail' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Validation' }
+    delete:
+      tags: [Cards]
+      operationId: deleteCard
+      description: Xóa vĩnh viễn thẻ và dữ liệu liên quan; không thể khôi phục.
+      responses:
+        '204': { description: Đã xóa }
+        '404': { $ref: '#/components/responses/NotFound' }
   /cards/{cardId}/move:
     parameters: [ { $ref: '#/components/parameters/CardId' } ]
     post:
@@ -226,6 +273,7 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Giới hạn WIP của cột đích đã đạt }
         '422': { $ref: '#/components/responses/Validation' }
   /cards/{cardId}/duplicate:
     parameters: [ { $ref: '#/components/parameters/CardId' } ]
@@ -236,6 +284,7 @@ paths:
       responses:
         '201': { description: Đã nhân bản, content: { application/json: { schema: { $ref: '#/components/schemas/CardSummary' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Giới hạn WIP của cột đã đạt }
   /cards/{cardId}/archive:
     parameters: [ { $ref: '#/components/parameters/CardId' } ]
     post:
@@ -544,7 +593,37 @@ components:
     List:
       type: object
       required: [id, boardId, name]
-      properties: { id: { type: string, format: uuid }, boardId: { type: string, format: uuid }, name: { type: string } }
+      properties: { id: { type: string, format: uuid }, boardId: { type: string, format: uuid }, name: { type: string }, wipLimit: { type: integer, minimum: 1, nullable: true }, color: { type: string, enum: [blue, orange, green, red, purple, pink, lime, sky], nullable: true } }
+    ArchivedList:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    Activity:
+      type: object
+      required: [id, boardId, cardId, userId, type, data, createdAt, actor]
+      properties:
+        id: { type: string, format: uuid }
+        boardId: { type: string, format: uuid }
+        cardId: { type: string, format: uuid, nullable: true }
+        userId: { type: string, format: uuid }
+        type: { type: string }
+        data: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+        actor:
+          type: object
+          required: [id, name]
+          properties: { id: { type: string, format: uuid }, name: { type: string } }
+    ArchivedCard:
+      type: object
+      required: [id, title, listId, listName, listArchived]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        listId: { type: string, format: uuid }
+        listName: { type: string }
+        listArchived: { type: boolean }
     CardSummary:
       type: object
       required: [id, listId, title, labelIds, memberIds, dueDate, dueComplete, checklistDone, checklistTotal, commentCount]

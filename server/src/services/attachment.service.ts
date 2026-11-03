@@ -5,6 +5,7 @@ import {
 import { IBoardRepository } from '../repositories/interfaces/IBoardRepository.js';
 import { CloudinaryService } from './cloudinary.service.js';
 import { Card } from '../models/index.js';
+import { emitBoardChanged } from '../realtime/socket.js';
 
 export class AttachmentService {
   constructor(
@@ -47,7 +48,7 @@ export class AttachmentService {
     const uploadResult = await CloudinaryService.uploadBuffer(fileBuffer, fileName, mimeType);
 
     // 2. Lưu thông tin vào CSDL PostgreSQL
-    return this.attachmentRepo.createAttachment({
+    const created = await this.attachmentRepo.createAttachment({
       cardId,
       boardId: card.boardId,
       fileName,
@@ -58,6 +59,8 @@ export class AttachmentService {
       size: uploadResult.size,
       isCover,
     });
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId });
+    return created;
   }
 
   /**
@@ -70,7 +73,7 @@ export class AttachmentService {
 
   /** Tạo bản sao metadata, dùng chung tệp gốc để không tải lại video hoặc ảnh lớn. */
   async duplicateAttachment(userId: string, cardId: string, attachmentId: string): Promise<AttachmentEntity> {
-    await this.verifyCardAccess(cardId, userId);
+    const card = await this.verifyCardAccess(cardId, userId);
     const attachment = await this.attachmentRepo.findById(attachmentId);
     if (!attachment || attachment.cardId !== cardId) {
       const error: any = new Error('Không tìm thấy tệp đính kèm');
@@ -78,7 +81,7 @@ export class AttachmentService {
       throw error;
     }
 
-    return this.attachmentRepo.createAttachment({
+    const created = await this.attachmentRepo.createAttachment({
       cardId,
       boardId: attachment.boardId,
       fileName: attachment.fileName,
@@ -89,6 +92,8 @@ export class AttachmentService {
       size: attachment.size,
       isCover: false,
     });
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId });
+    return created;
   }
 
   /**
@@ -99,7 +104,7 @@ export class AttachmentService {
     cardId: string,
     attachmentId: string
   ): Promise<void> {
-    await this.verifyCardAccess(cardId, userId);
+    const card = await this.verifyCardAccess(cardId, userId);
 
     const attachment = await this.attachmentRepo.findById(attachmentId);
     if (!attachment || attachment.cardId !== cardId) {
@@ -110,6 +115,7 @@ export class AttachmentService {
 
     // Chỉ xoá tệp gốc khi không còn bản sao nào cùng tham chiếu.
     await this.attachmentRepo.deleteAttachment(attachmentId);
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId });
     if (attachment.publicId && await this.attachmentRepo.countByPublicId(attachment.publicId) === 0) {
       await CloudinaryService.deleteFile(attachment.publicId, attachment.fileType);
     }
@@ -124,7 +130,7 @@ export class AttachmentService {
     attachmentId: string,
     isCover: boolean
   ): Promise<AttachmentEntity> {
-    await this.verifyCardAccess(cardId, userId);
+    const card = await this.verifyCardAccess(cardId, userId);
 
     const updated = await this.attachmentRepo.setCover(cardId, attachmentId, isCover);
     if (!updated) {
@@ -133,6 +139,7 @@ export class AttachmentService {
       throw error;
     }
 
+    emitBoardChanged(card.boardId, { type: 'card.updated', actorId: userId, cardId });
     return updated;
   }
 }

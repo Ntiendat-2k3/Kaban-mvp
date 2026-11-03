@@ -140,6 +140,8 @@ export class BoardController {
         id: l.id,
         boardId: l.boardId,
         name: l.title,
+        wipLimit: l.wipLimit,
+        color: l.color,
         cards: cardsByList.get(l.id) || [],
       }));
 

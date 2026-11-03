@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { Clock, CheckSquare, MessageSquare } from 'lucide-react';
 import { CardSummary, BoardLabel } from '@/types/board-detail';
 import { BoardMember } from '@/types/board';
@@ -9,6 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/atoms/avatar';
 import { Badge } from '@/components/atoms/badge';
 import { cn } from '@/lib/utils';
 import { LABEL_COLOR_CONFIG } from '@/lib/label-colors';
+import { getCardDetail } from '@/lib/api/card-detail';
 
 export interface CardTileProps {
   card: CardSummary;
@@ -17,6 +19,8 @@ export interface CardTileProps {
   membersMap?: Map<string, BoardMember>;
   dragProps?: Record<string, any>;
   isDragging?: boolean;
+  titleEditor?: React.ReactNode;
+  editingMinHeight?: number;
 }
 
 /**
@@ -30,7 +34,16 @@ export function CardTile({
   membersMap,
   dragProps,
   isDragging,
+  titleEditor,
+  editingMinHeight,
 }: CardTileProps) {
+  const queryClient = useQueryClient();
+  const prefetchDetail = () => {
+    void queryClient.prefetchQuery({
+      queryKey: ['card', card.id],
+      queryFn: () => getCardDetail(card.id),
+    });
+  };
   // Tính màu sắc cảnh báo của Ngày hạn theo SRS §7, BR-08 và TC-03.1-04
   const getDueDateStatus = () => {
     if (!card.dueDate) return null;
@@ -66,15 +79,14 @@ export function CardTile({
 
   const dueStatus = getDueDateStatus();
 
-  return (
-    <Link
-      href={`/b/${boardId}/c/${card.id}`}
-      {...dragProps}
-      className={cn(
-        'group relative flex flex-col gap-2 rounded-lg border bg-card p-2.5 text-card-foreground shadow-sm transition-all duration-150 hover:border-primary/50 hover:shadow focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer',
-        isDragging && 'opacity-40 ring-2 ring-primary shadow-lg'
-      )}
-    >
+  const className = cn(
+    'group relative flex flex-col gap-2 rounded-lg border bg-card p-2.5 text-card-foreground shadow-sm transition-all duration-150 hover:border-primary/50 hover:shadow focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer',
+    isDragging && 'opacity-40 ring-2 ring-primary shadow-lg',
+    titleEditor && 'cursor-text border-primary ring-2 ring-primary/70'
+  );
+
+  const content = (
+    <>
       {/* 0. Video bìa hoặc Ảnh bìa trên thẻ Kanban (REQ-ATT-03, REQ-ATT-04, BR-04, RISK-03, TC-02.2-01, TC-02.2-02, TC-02.2-03, TC-02.2-04) */}
       {card.coverUrl && (
         <div className="-mx-2.5 -mt-2.5 overflow-hidden rounded-t-lg bg-black/5 dark:bg-black/40">
@@ -130,7 +142,7 @@ export function CardTile({
 
       {/* 2. Tiêu đề thẻ (1–512 ký tự) */}
       <h4 className="text-base font-medium leading-snug break-words text-foreground">
-        {card.title}
+        {titleEditor ?? card.title}
       </h4>
 
       {/* 3. Dòng thông tin trạng thái: Hạn, Checklist, Comment, Avatars */}
@@ -197,6 +209,10 @@ export function CardTile({
           </div>
         )}
       </div>
-    </Link>
+    </>
   );
+
+  return titleEditor
+    ? <div {...dragProps} className={className} style={{ minHeight: editingMinHeight }}>{content}</div>
+    : <Link href={`/b/${boardId}/c/${card.id}`} onMouseEnter={prefetchDetail} onFocus={prefetchDetail} {...dragProps} className={className}>{content}</Link>;
 }

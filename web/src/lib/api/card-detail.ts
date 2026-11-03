@@ -1,6 +1,15 @@
 import { apiClient } from './client';
 import { CardDetail, CardPatchInput, Checklist, ChecklistItem, Comment } from '@/types/card-detail';
 import { BoardLabel } from '@/types/board-detail';
+import type { components } from '@/types/api';
+
+export type ArchivedCard = components['schemas']['ArchivedCard'];
+
+/** Liệt kê các thẻ có thể tìm lại từ kho lưu trữ của bảng. */
+export async function getArchivedCards(boardId: string): Promise<ArchivedCard[]> {
+  const response = await apiClient.get<ArchivedCard[]>(`/boards/${boardId}/archived-cards`);
+  return response.data;
+}
 
 /**
  * Lấy chi tiết thẻ (API-08, BR-01)
@@ -23,6 +32,11 @@ export async function updateCard(cardId: string, patch: CardPatchInput): Promise
  */
 export async function archiveCard(cardId: string): Promise<void> {
   await apiClient.post(`/cards/${cardId}/archive`);
+}
+
+/** Xóa vĩnh viễn thẻ và nội dung của thẻ. */
+export async function deleteCard(cardId: string): Promise<void> {
+  await apiClient.delete(`/cards/${cardId}`);
 }
 
 /**

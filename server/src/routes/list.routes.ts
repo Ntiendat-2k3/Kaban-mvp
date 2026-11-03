@@ -16,6 +16,7 @@ listRouter.post(
   validate(createListSchema as any),
   ListController.createList
 );
+listRouter.get('/boards/:boardId/archived-lists', authMiddleware, ListController.getArchivedLists);
 listRouter.patch(
   '/lists/:listId',
   authMiddleware,
@@ -23,6 +24,7 @@ listRouter.patch(
   ListController.updateList
 );
 listRouter.post('/lists/:listId/archive', authMiddleware, ListController.archiveList);
+listRouter.post('/lists/:listId/restore', authMiddleware, ListController.restoreList);
 listRouter.post(
   '/lists/:listId/move',
   authMiddleware,

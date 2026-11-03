@@ -2,6 +2,7 @@ import {
   ICardRepository,
   CardSummaryEntity,
   CardDetailEntity,
+  ArchivedCardEntity,
 } from '../interfaces/ICardRepository.js';
 import {
   Card,
@@ -15,8 +16,11 @@ import {
   CardLabel,
   CardMember,
   Attachment,
+  Activity,
 } from '../../models/index.js';
 import { sequelize } from '../../config/database.js';
+import { Op } from 'sequelize';
+import { computePosition, POSITION_STEP } from '../../utils/position.js';
 
 export class SequelizeCardRepository implements ICardRepository {
   async createCard(listId: string, title: string): Promise<CardSummaryEntity> {
@@ -160,52 +164,29 @@ export class SequelizeCardRepository implements ICardRepository {
   }
 
   async moveCard(cardId: string, toListId: string, toIndex: number): Promise<boolean> {
-    const card = await Card.findByPk(cardId);
-    if (!card) return false;
+    return sequelize.transaction(async (transaction) => {
+      const card = await Card.findByPk(cardId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!card || card.isArchived) return false;
+      const targetList = await List.findByPk(toListId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!targetList) return false;
 
-    const targetList = await List.findByPk(toListId);
-    if (!targetList) return false;
-
-    // Di chuyển trong cùng list
-    if (card.listId === toListId) {
-      const cards = await Card.findAll({
-        where: { listId: toListId, isArchived: false },
-        order: [['position', 'ASC']],
+      // Kh?a th? ??ch ?? hai l??t k?o ??ng th?i kh?ng d?ng c?ng v? tr? c?.
+      const siblings = await Card.findAll({
+        where: { listId: toListId, isArchived: false, id: { [Op.ne]: cardId } },
+        order: [['position', 'ASC']], transaction, lock: transaction.LOCK.UPDATE,
       });
-
-      if (cards.length === 0) return false;
-
-      const clampedIndex = Math.max(0, Math.min(toIndex, cards.length - 1));
-      const remaining = cards.filter((c) => c.id !== cardId);
-      remaining.splice(clampedIndex, 0, card);
-
-      await Promise.all(
-        remaining.map((c, idx) => {
-          c.position = (idx + 1) * 65535;
-          return c.save();
-        })
-      );
+      const index = Math.max(0, Math.min(toIndex, siblings.length));
+      const { position, needsRebalance } = computePosition(siblings[index - 1]?.position, siblings[index]?.position);
+      if (!needsRebalance) {
+        await card.update({ listId: toListId, position }, { transaction });
+        return true;
+      }
+      siblings.splice(index, 0, card);
+      for (const [i, sibling] of siblings.entries()) {
+        await sibling.update({ listId: toListId, position: (i + 1) * POSITION_STEP }, { transaction });
+      }
       return true;
-    }
-
-    // Di chuyển sang list khác (kể cả list rỗng)
-    const targetCards = await Card.findAll({
-      where: { listId: toListId, isArchived: false },
-      order: [['position', 'ASC']],
     });
-
-    card.listId = toListId;
-    const clampedIndex = Math.max(0, Math.min(toIndex, targetCards.length));
-    targetCards.splice(clampedIndex, 0, card);
-
-    await Promise.all(
-      targetCards.map((c, idx) => {
-        c.position = (idx + 1) * 65535;
-        return c.save();
-      })
-    );
-
-    return true;
   }
 
   async getCardDetail(cardId: string): Promise<CardDetailEntity | null> {
@@ -358,6 +339,65 @@ export class SequelizeCardRepository implements ICardRepository {
 
     card.isArchived = true;
     await card.save();
+  }
+
+  /** Liệt kê thẻ đã lưu trữ kèm trạng thái danh sách gốc để giao diện biết thẻ nào có thể khôi phục. */
+  async getArchivedCards(boardId: string): Promise<ArchivedCardEntity[]> {
+    const cards = await Card.findAll({
+      attributes: ['id', 'title', 'listId'],
+      where: { boardId, isArchived: true },
+      order: [['updatedAt', 'DESC']],
+    });
+    if (cards.length === 0) return [];
+
+    const lists = await List.findAll({
+      attributes: ['id', 'title', 'isArchived'],
+      where: { id: { [Op.in]: [...new Set(cards.map((card) => card.listId))] } },
+    });
+    const listsById = new Map(lists.map((list) => [list.id, list]));
+    return cards.map((card) => {
+      const list = listsById.get(card.listId);
+      return {
+        id: card.id,
+        title: card.title,
+        listId: card.listId,
+        listName: list?.title ?? 'Danh sách không còn tồn tại',
+        listArchived: !list || list.isArchived,
+      };
+    });
+  }
+
+  /** Xóa thẻ cùng dữ liệu phụ thuộc trong một giao dịch; trả về tệp cần dọn khỏi Cloudinary. */
+  async deleteCard(cardId: string): Promise<Array<{ publicId: string; fileType: 'image' | 'video' }> | null> {
+    return sequelize.transaction(async (transaction) => {
+      const card = await Card.findByPk(cardId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!card) return null;
+
+      const attachments = await Attachment.findAll({
+        attributes: ['publicId', 'fileType'],
+        where: { cardId },
+        transaction,
+      });
+      const checklists = await Checklist.findAll({ attributes: ['id'], where: { cardId }, transaction });
+      if (checklists.length > 0) {
+        await ChecklistItem.destroy({
+          where: { checklistId: { [Op.in]: checklists.map((checklist) => checklist.id) } },
+          transaction,
+        });
+      }
+
+      await Checklist.destroy({ where: { cardId }, transaction });
+      await Comment.destroy({ where: { cardId }, transaction });
+      await CardLabel.destroy({ where: { cardId }, transaction });
+      await CardMember.destroy({ where: { cardId }, transaction });
+      await Attachment.destroy({ where: { cardId }, transaction });
+      await Activity.update({ cardId: null }, { where: { cardId }, transaction });
+      await card.destroy({ transaction });
+
+      return attachments
+        .filter((attachment) => attachment.publicId)
+        .map((attachment) => ({ publicId: attachment.publicId!, fileType: attachment.fileType }));
+    });
   }
 
   async restoreCard(cardId: string): Promise<CardSummaryEntity> {

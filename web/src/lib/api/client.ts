@@ -1,6 +1,12 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+/** Lấy thông báo xung đột nghiệp vụ do API trả về, nếu có. */
+export function getConflictMessage(error: unknown): string | undefined {
+  if (!isAxiosError(error) || error.response?.status !== 409) return undefined;
+  return (error.response.data as { error?: { message?: string } })?.error?.message;
+}
 
 /**
  * Axios client kết nối backend API
