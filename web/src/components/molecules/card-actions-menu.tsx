@@ -136,6 +136,7 @@ export function CardActionsMenu({
       onPointerDown={(event) => event.stopPropagation()}
       onBlur={() => void saveRename()}
       onKeyDown={(event) => {
+        event.stopPropagation();
         if (event.key === 'Enter') { event.preventDefault(); void saveRename(); }
         if (event.key === 'Escape') {
           cancelRef.current = true;
