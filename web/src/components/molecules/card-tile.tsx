@@ -141,7 +141,7 @@ export function CardTile({
       )}
 
       {/* 2. Tiêu đề thẻ (1–512 ký tự) */}
-      <h4 className="text-base font-medium leading-snug break-words text-foreground">
+      <h4 data-card-title className="text-base font-medium leading-snug break-words text-foreground">
         {titleEditor ?? card.title}
       </h4>
 

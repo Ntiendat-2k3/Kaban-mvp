@@ -11,11 +11,14 @@ import { Button } from '@/components/atoms/button';
 import { Spinner } from '@/components/atoms/spinner';
 import { loginSchema, type LoginFormValues } from '@/lib/validations/auth';
 import { apiClient } from '@/lib/api/client';
+import { safeAuthRedirect } from '@/lib/auth-redirect';
+import { useAuthStore } from '@/lib/store/use-auth-store';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/boards';
+  const redirectUrl = safeAuthRedirect(searchParams.get('redirect'));
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -37,10 +40,7 @@ function LoginForm() {
       const response = await apiClient.post('/auth/login', values);
       const data = response.data;
 
-      // Lưu token vào localStorage theo đúng SRS §4
-      if (data?.token) {
-        localStorage.setItem('trello.token', data.token);
-      }
+      if (data?.token && data?.user) setAuth(data.user, data.token);
 
       // Chuyển hướng tới URL dự định hoặc mặc định /boards
       router.push(redirectUrl);
@@ -101,7 +101,7 @@ function LoginForm() {
 
       <div className="text-center text-sm text-muted-foreground">
         Chưa có tài khoản?{' '}
-        <Link href="/register" className="font-semibold text-primary hover:underline">
+        <Link href={`/register?redirect=${encodeURIComponent(redirectUrl)}`} className="font-semibold text-primary hover:underline">
           Đăng ký ngay
         </Link>
       </div>

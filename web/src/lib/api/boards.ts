@@ -80,11 +80,9 @@ export async function getBoardMembers(boardId: string): Promise<BoardMember[]> {
   return response.data;
 }
 
-/**
- * Mời thành viên mới bằng email (API-10, REQ-BD-06)
- */
-export async function addBoardMember(boardId: string, email: string): Promise<BoardMember> {
-  const response = await apiClient.post<BoardMember>(`/boards/${boardId}/members`, { email });
+/** Gửi link mời tới email; người nhận chỉ xuất hiện trong bảng sau khi chấp nhận. */
+export async function inviteBoardMember(boardId: string, email: string): Promise<{ email: string }> {
+  const response = await apiClient.post<{ email: string }>(`/boards/${boardId}/members`, { email });
   return response.data;
 }
 

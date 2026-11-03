@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AuthLayout } from '@/components/templates/auth-layout';
@@ -11,9 +11,13 @@ import { Button } from '@/components/atoms/button';
 import { Spinner } from '@/components/atoms/spinner';
 import { registerSchema, type RegisterFormValues } from '@/lib/validations/auth';
 import { apiClient } from '@/lib/api/client';
+import { safeAuthRedirect } from '@/lib/auth-redirect';
+import { useAuthStore } from '@/lib/store/use-auth-store';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const redirectUrl = safeAuthRedirect(useSearchParams().get('redirect'));
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const {
@@ -36,13 +40,10 @@ export default function RegisterPage() {
       const response = await apiClient.post('/auth/register', values);
       const data = response.data;
 
-      // Lưu token vào localStorage theo đúng SRS §4
-      if (data?.token) {
-        localStorage.setItem('trello.token', data.token);
-      }
+      if (data?.token && data?.user) setAuth(data.user, data.token);
 
-      // Tự động chuyển tới trang /boards
-      router.push('/boards');
+      // Trở lại link mời sau đăng ký nếu người dùng đi từ lời mời.
+      router.push(redirectUrl);
     } catch (err: any) {
       const responseError = err.response?.data?.error;
       if (responseError?.code === 'EMAIL_TAKEN' || err.response?.status === 409) {
@@ -113,11 +114,19 @@ export default function RegisterPage() {
 
         <div className="text-center text-sm text-muted-foreground">
           Đã có tài khoản?{' '}
-          <Link href="/login" className="font-semibold text-primary hover:underline">
+          <Link href={`/login?redirect=${encodeURIComponent(redirectUrl)}`} className="font-semibold text-primary hover:underline">
             Đăng nhập
           </Link>
         </div>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<AuthLayout><div className="flex h-40 items-center justify-center"><Spinner /></div></AuthLayout>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

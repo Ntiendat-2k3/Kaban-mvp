@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Copy, Files, Link2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { toast } from 'sonner';
@@ -32,6 +33,7 @@ export function CardActionsMenu({
   onRename,
   onDelete,
 }: CardActionsMenuProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -41,6 +43,11 @@ export function CardActionsMenu({
   const inputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
   const cancelRef = useRef(false);
+  const titleClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (titleClickTimer.current) clearTimeout(titleClickTimer.current);
+  }, []);
 
   useEffect(() => setTitleValue(card.title), [card.title]);
   useEffect(() => {
@@ -48,6 +55,8 @@ export function CardActionsMenu({
   }, [isEditing]);
   const startRename = () => {
     if (!onRename || disabled) return;
+    if (titleClickTimer.current) clearTimeout(titleClickTimer.current);
+    titleClickTimer.current = null;
     cancelRef.current = false;
     setEditingMinHeight(cardRef.current?.getBoundingClientRect().height);
     setTitleValue(card.title);
@@ -143,9 +152,30 @@ export function CardActionsMenu({
       <div
         ref={cardRef}
         className="group relative min-w-0"
+        onClickCapture={(event) => {
+          if (!(event.target as HTMLElement).closest('[data-card-title]')) {
+            if (titleClickTimer.current) clearTimeout(titleClickTimer.current);
+            titleClickTimer.current = null;
+            return;
+          }
+          if (!onRename || disabled || isEditing || event.button !== 0 || event.detail === 0 ||
+              event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+          event.preventDefault();
+          if (event.detail > 1) {
+            startRename();
+          } else {
+            titleClickTimer.current = setTimeout(() => {
+              titleClickTimer.current = null;
+              router.push(`/b/${boardId}/c/${card.id}`);
+            }, 300);
+          }
+        }}
         onContextMenu={(event) => {
           if (disabled) return;
           event.preventDefault();
+          if (titleClickTimer.current) clearTimeout(titleClickTimer.current);
+          titleClickTimer.current = null;
           setIsOpen(true);
         }}
         onKeyDownCapture={handleKeyDown}

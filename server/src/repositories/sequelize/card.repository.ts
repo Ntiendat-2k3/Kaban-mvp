@@ -5,6 +5,7 @@ import {
   ArchivedCardEntity,
 } from '../interfaces/ICardRepository.js';
 import {
+  Board,
   Card,
   List,
   Label,
@@ -15,6 +16,7 @@ import {
   BoardMember,
   CardLabel,
   CardMember,
+  CardDueReminder,
   Attachment,
   Activity,
 } from '../../models/index.js';
@@ -239,10 +241,12 @@ export class SequelizeCardRepository implements ICardRepository {
     boardMembers.forEach((bm) => {
       memberRoleMap.set(bm.userId, bm.role === 'admin' ? 'owner' : 'member');
     });
+    const board = await Board.findByPk(card.boardId, { attributes: ['ownerId'] });
+    if (board) memberRoleMap.set(board.ownerId, 'owner');
 
     const cardAny = card as any;
     const labels = (cardAny.labels || []).map((l: any) => l.id);
-    const members = (cardAny.members || []).map((m: any) => ({
+    const members = (cardAny.members || []).filter((m: any) => memberRoleMap.has(m.id)).map((m: any) => ({
       userId: m.id,
       name: m.name,
       email: m.email,
@@ -390,6 +394,7 @@ export class SequelizeCardRepository implements ICardRepository {
       await Comment.destroy({ where: { cardId }, transaction });
       await CardLabel.destroy({ where: { cardId }, transaction });
       await CardMember.destroy({ where: { cardId }, transaction });
+      await CardDueReminder.destroy({ where: { cardId }, transaction });
       await Attachment.destroy({ where: { cardId }, transaction });
       await Activity.update({ cardId: null }, { where: { cardId }, transaction });
       await card.destroy({ transaction });

@@ -5,6 +5,7 @@ import { syncDatabase } from './models/index.js';
 import { runMigrations } from './config/migrations.js';
 import { createServer } from 'http';
 import { initSocket } from './realtime/socket.js';
+import { startDueReminderWorker } from './services/due-reminder.service.js';
 
 async function bootstrap() {
   if (!ENV.JWT_SECRET || !ENV.DATABASE_URL) {
@@ -13,6 +14,7 @@ async function bootstrap() {
   await connectDatabase();
   await syncDatabase(false);
   await runMigrations();
+  startDueReminderWorker();
 
   const httpServer = createServer(app);
   initSocket(httpServer);

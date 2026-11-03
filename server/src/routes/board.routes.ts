@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { BoardController } from '../controllers/board.controller.js';
+import { BoardInvitationController } from '../controllers/board-invitation.controller.js';
 import { ActivityController } from '../controllers/activity.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
@@ -7,9 +9,21 @@ import {
   createBoardSchema,
   updateBoardSchema,
   addMemberSchema,
+  boardInvitationTokenSchema,
 } from '../validations/board.schema.js';
 
 export const boardRouter = Router();
+const inviteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Gửi quá nhiều lời mời, vui lòng thử lại sau' } },
+});
+
+// Link mời có thể xem khi chưa đăng nhập; chấp nhận lời mời cần tài khoản đúng email.
+boardRouter.get('/invitations/:token', validate(boardInvitationTokenSchema), BoardInvitationController.get);
+boardRouter.post('/invitations/:token/accept', authMiddleware, validate(boardInvitationTokenSchema), BoardInvitationController.accept);
 
 // CRUD bảng
 boardRouter.get('/boards', authMiddleware, BoardController.getBoards);
@@ -39,6 +53,7 @@ boardRouter.get('/boards/:boardId/members', authMiddleware, BoardController.getM
 boardRouter.post(
   '/boards/:boardId/members',
   authMiddleware,
+  inviteLimiter,
   validate(addMemberSchema as any),
   BoardController.addMember
 );

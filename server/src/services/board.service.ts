@@ -5,7 +5,7 @@ import {
   BoardBackground,
 } from '../repositories/interfaces/IBoardRepository.js';
 import { IUserRepository } from '../repositories/interfaces/IUserRepository.js';
-import { Label, User } from '../models/index.js';
+import { Label } from '../models/index.js';
 import { emitBoardChanged, removeBoardMemberSocket } from '../realtime/socket.js';
 
 export class BoardService {
@@ -173,54 +173,6 @@ export class BoardService {
       throw error;
     }
     return this.boardRepo.getMembers(boardId);
-  }
-
-  /**
-   * Mời thành viên mới bằng email (API-10, BR-07, RISK-01)
-   */
-  async addMember(
-    boardId: string,
-    callerUserId: string,
-    email: string
-  ): Promise<BoardMemberEntity> {
-    const callerRole = await this.boardRepo.getUserRole(boardId, callerUserId);
-    if (!callerRole) {
-      const error: any = new Error('Không tìm thấy bảng');
-      error.statusCode = 404;
-      throw error;
-    }
-    if (callerRole !== 'owner') {
-      const error: any = new Error('Chỉ chủ sở hữu (Owner) mới có quyền mời thành viên');
-      error.statusCode = 403;
-      throw error;
-    }
-
-    // 1. Tìm tài khoản người dùng theo email
-    const targetUser = await User.findOne({ where: { email } });
-    if (!targetUser) {
-      const error: any = new Error('Không tìm thấy người dùng');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    // 2. Kiểm tra người dùng đã là thành viên hoặc owner chưa (RISK-01)
-    const existingRole = await this.boardRepo.getUserRole(boardId, targetUser.id);
-    if (existingRole) {
-      const error: any = new Error('Người dùng đã là thành viên');
-      error.statusCode = 409;
-      throw error;
-    }
-
-    // 3. Thêm vào bảng
-    await this.boardRepo.addMember(boardId, targetUser.id, 'member');
-    emitBoardChanged(boardId, { type: 'board.updated', actorId: callerUserId });
-
-    return {
-      userId: targetUser.id,
-      name: targetUser.name,
-      email: targetUser.email,
-      role: 'member',
-    };
   }
 
   /**

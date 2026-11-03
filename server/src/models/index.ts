@@ -84,6 +84,33 @@ BoardMember.init(
   { sequelize, modelName: 'BoardMember', tableName: 'board_members', timestamps: true }
 );
 
+// Lời mời chỉ cấp quyền sau khi người nhận xác thực đúng email và dùng token một lần.
+export class BoardInvitation extends Model {
+  declare id: string;
+  declare boardId: string;
+  declare email: string;
+  declare tokenHash: string;
+  declare expiresAt: Date;
+  declare readonly createdAt: Date;
+}
+BoardInvitation.init(
+  {
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    boardId: { type: DataTypes.UUID, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: false },
+    tokenHash: { type: DataTypes.STRING(64), allowNull: false, unique: true },
+    expiresAt: { type: DataTypes.DATE, allowNull: false },
+  },
+  {
+    sequelize,
+    modelName: 'BoardInvitation',
+    tableName: 'board_invitations',
+    timestamps: true,
+    updatedAt: false,
+    indexes: [{ name: 'board_invitations_board_email_idx', unique: true, fields: ['boardId', 'email'] }],
+  }
+);
+
 // ================= BOARD STAR =================
 export class BoardStar extends Model {
   declare id: string;
@@ -205,6 +232,31 @@ CardMember.init(
     userId: { type: DataTypes.UUID, allowNull: false, primaryKey: true },
   },
   { sequelize, modelName: 'CardMember', tableName: 'card_members', timestamps: false }
+);
+
+// Ghi nhận một lần nhắc cho mỗi người được gán và mỗi mốc hạn của thẻ.
+export class CardDueReminder extends Model {
+  declare cardId: string;
+  declare userId: string;
+  declare dueDate: Date;
+  declare claimedAt: Date | null;
+  declare sentAt: Date | null;
+}
+CardDueReminder.init(
+  {
+    cardId: { type: DataTypes.UUID, allowNull: false, primaryKey: true },
+    userId: { type: DataTypes.UUID, allowNull: false, primaryKey: true },
+    dueDate: { type: DataTypes.DATE, allowNull: false, primaryKey: true },
+    claimedAt: { type: DataTypes.DATE, allowNull: true },
+    sentAt: { type: DataTypes.DATE, allowNull: true },
+  },
+  {
+    sequelize,
+    modelName: 'CardDueReminder',
+    tableName: 'card_due_reminders',
+    timestamps: false,
+    indexes: [{ name: 'card_due_reminders_pending_idx', fields: ['sentAt', 'claimedAt', 'dueDate'] }],
+  }
 );
 
 // ================= CHECKLIST MODEL =================

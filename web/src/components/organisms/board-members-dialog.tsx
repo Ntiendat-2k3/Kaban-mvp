@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback } from '@/components/atoms/avatar';
 import { Badge } from '@/components/atoms/badge';
 import { Spinner } from '@/components/atoms/spinner';
 import { Board } from '@/types/board';
-import { getBoardMembers, addBoardMember, removeBoardMember } from '@/lib/api/boards';
+import { getBoardMembers, inviteBoardMember, removeBoardMember } from '@/lib/api/boards';
 import { useAuthStore } from '@/lib/store/use-auth-store';
 
 interface BoardMembersDialogProps {
@@ -28,7 +28,7 @@ interface BoardMembersDialogProps {
 
 /**
  * Organism BoardMembersDialog - Quản lý thành viên bảng làm việc
- * Hỗ trợ liệt kê, mời bằng email, xoá thành viên và tự rời bảng (SRS §6, §7)
+ * Hỗ trợ liệt kê, gửi lời mời qua email, xoá thành viên và tự rời bảng (SRS §6, §7).
  */
 export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDialogProps) {
   const router = useRouter();
@@ -37,6 +37,7 @@ export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDi
 
   const [email, setEmail] = useState('');
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   // Lấy danh sách thành viên từ server
   const {
@@ -49,18 +50,18 @@ export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDi
     enabled: open,
   });
 
-  // Mutation mời thành viên mới
+  // Gửi lời mời tới email, kể cả khi người nhận chưa có tài khoản.
   const inviteMutation = useMutation({
-    mutationFn: (emailToInvite: string) => addBoardMember(board.id, emailToInvite),
-    onSuccess: () => {
+    mutationFn: (emailToInvite: string) => inviteBoardMember(board.id, emailToInvite),
+    onSuccess: ({ email: invitedEmail }) => {
       setEmail('');
       setInviteError(null);
-      queryClient.invalidateQueries({ queryKey: ['board-members', board.id] });
+      setInviteSuccess(`Hệ thống email đã tiếp nhận lời mời tới ${invitedEmail}. Người này sẽ xuất hiện sau khi chấp nhận.`);
     },
     onError: (err: any) => {
-      // Phân tách lỗi rõ ràng theo SRS §6 (Không tìm thấy người dùng / Người dùng đã là thành viên)
+      // Hiển thị lỗi SMTP hoặc người đã là thành viên theo phản hồi từ API.
       const message =
-        err?.response?.data?.error || err?.message || 'Không thể thêm thành viên vào bảng';
+        err?.response?.data?.error?.message || err?.message || 'Không thể thêm thành viên vào bảng';
       setInviteError(message);
     },
   });
@@ -76,6 +77,8 @@ export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDi
         return;
       }
       queryClient.invalidateQueries({ queryKey: ['board-members', board.id] });
+      queryClient.invalidateQueries({ queryKey: ['board', board.id] });
+      queryClient.invalidateQueries({ queryKey: ['card'] });
     },
   });
 
@@ -84,6 +87,7 @@ export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDi
     const trimmed = email.trim();
     if (!trimmed) return;
     setInviteError(null);
+    setInviteSuccess(null);
     inviteMutation.mutate(trimmed);
   };
 
@@ -95,11 +99,11 @@ export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDi
         <DialogHeader>
           <DialogTitle>Thành viên bảng</DialogTitle>
           <DialogDescription>
-            Quản lý những người có quyền truy cập và cộng tác trong không gian làm việc này.
+            Mời bất kỳ địa chỉ email nào tham gia bảng. Người nhận có thể đăng ký Kaban khi mở link mời.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Form mời thành viên bằng email (chỉ dành cho Owner - SRS §6) */}
+        {/* Chỉ chủ bảng được gửi link mời thành viên qua email. */}
         {isOwner && (
           <form onSubmit={handleInviteSubmit} className="space-y-2 pt-2">
             <div className="flex space-x-2">
@@ -133,6 +137,9 @@ export function BoardMembersDialog({ board, open, onOpenChange }: BoardMembersDi
               <p role="alert" className="text-xs font-medium text-destructive">
                 {inviteError}
               </p>
+            )}
+            {inviteSuccess && (
+              <p role="status" className="text-xs font-medium text-green-500">{inviteSuccess}</p>
             )}
           </form>
         )}

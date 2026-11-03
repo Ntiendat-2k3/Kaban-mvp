@@ -35,6 +35,12 @@ const migrations = [
       'CREATE INDEX IF NOT EXISTS "activities_card_created_idx" ON "activities" ("cardId", "createdAt" DESC)',
     ],
   },
+  {
+    name: '20261103_card_due_reminder_lookup',
+    statements: [
+      'CREATE INDEX IF NOT EXISTS "cards_due_reminder_idx" ON "cards" ("dueDate") WHERE "dueDate" IS NOT NULL AND "isArchived" = FALSE AND "dueComplete" = FALSE',
+    ],
+  },
 ];
 
 export async function runMigrations(): Promise<void> {

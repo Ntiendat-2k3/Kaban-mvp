@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sequelize } from '../../config/database.js';
-import { Activity, Attachment, Card, CardLabel, CardMember, Checklist, ChecklistItem, Comment, List } from '../../models/index.js';
+import { Activity, Attachment, Card, CardDueReminder, CardLabel, CardMember, Checklist, ChecklistItem, Comment, List } from '../../models/index.js';
 import { SequelizeCardRepository } from './card.repository.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -21,6 +21,7 @@ describe('xóa thẻ và dữ liệu phụ thuộc', () => {
     const destroyComments = vi.spyOn(Comment, 'destroy').mockResolvedValue(1);
     const destroyLabels = vi.spyOn(CardLabel, 'destroy').mockResolvedValue(1);
     const destroyMembers = vi.spyOn(CardMember, 'destroy').mockResolvedValue(1);
+    const destroyReminders = vi.spyOn(CardDueReminder, 'destroy').mockResolvedValue(1);
     const destroyAttachments = vi.spyOn(Attachment, 'destroy').mockResolvedValue(2);
     const clearActivityCard = vi.spyOn(Activity, 'update').mockResolvedValue([1]);
 
@@ -28,7 +29,7 @@ describe('xóa thẻ và dữ liệu phụ thuộc', () => {
 
     expect(files).toEqual([{ publicId: 'file', fileType: 'image' }]);
     expect(destroyItems).toHaveBeenCalledWith(expect.objectContaining({ transaction }));
-    for (const destroy of [destroyChecklists, destroyComments, destroyLabels, destroyMembers, destroyAttachments]) {
+    for (const destroy of [destroyChecklists, destroyComments, destroyLabels, destroyMembers, destroyReminders, destroyAttachments]) {
       expect(destroy).toHaveBeenCalledWith(expect.objectContaining({ where: { cardId: 'card' }, transaction }));
       expect(destroy.mock.invocationCallOrder[0]).toBeLessThan(destroyCard.mock.invocationCallOrder[0]);
     }

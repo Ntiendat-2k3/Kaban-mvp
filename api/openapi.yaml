@@ -126,15 +126,38 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [Boards]
-      operationId: addBoardMember
-      description: Chỉ owner. 404 USER_NOT_FOUND nếu email chưa đăng ký; 409 ALREADY_MEMBER nếu đã là thành viên.
+      operationId: inviteBoardMember
+      description: Owner gửi link mời dùng một lần, hiệu lực 7 ngày, tới cả email chưa đăng ký. Quyền bảng chỉ được cấp khi người nhận chấp nhận bằng đúng email.
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
       responses:
-        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Member' } } } }
+        '202': { description: Đã gửi lời mời, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Validation' }
+        '424': { description: Brevo từ chối IP hoặc thông tin đăng nhập SMTP }
+        '503': { description: Chưa cấu hình SMTP hoặc gửi email thất bại }
+  /invitations/{token}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Boards]
+      operationId: getBoardInvitation
+      security: []
+      responses:
+        '200': { description: Lời mời còn hiệu lực, content: { application/json: { schema: { type: object, required: [boardName, email, expiresAt], properties: { boardName: { type: string }, email: { type: string, format: email }, expiresAt: { type: string, format: date-time } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /invitations/{token}/accept:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Boards]
+      operationId: acceptBoardInvitation
+      description: Tài khoản đăng nhập phải có đúng email được mời; token chỉ dùng một lần.
+      responses:
+        '200': { description: Đã tham gia, content: { application/json: { schema: { type: object, required: [boardId], properties: { boardId: { type: string, format: uuid } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /boards/{boardId}/members/{userId}:
     parameters:
       - { $ref: '#/components/parameters/BoardId' }

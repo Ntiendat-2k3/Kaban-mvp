@@ -51,6 +51,11 @@ export const addMemberSchema = z.object({
   body: z.object({
     email: z
       .string({ required_error: 'Email là bắt buộc' })
+      .trim()
       .email('Email không đúng định dạng'),
   }),
+});
+
+export const boardInvitationTokenSchema = z.object({
+  params: z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Link mời không hợp lệ') }),
 });

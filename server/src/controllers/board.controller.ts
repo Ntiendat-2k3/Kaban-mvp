@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { BoardService } from '../services/board.service.js';
+import { boardInvitationService } from '../services/board-invitation.service.js';
 import { SequelizeBoardRepository } from '../repositories/sequelize/board.repository.js';
 import { ResponseView } from '../views/response.view.js';
 import {
@@ -90,7 +91,9 @@ export class BoardController {
         labelIdsByCard.set(relation.cardId, ids);
       }
       const memberIdsByCard = new Map<string, string[]>();
+      const activeMemberIds = new Set(members.map((member) => member.userId));
       for (const relation of cardMembers) {
+        if (!activeMemberIds.has(relation.userId)) continue;
         const ids = memberIdsByCard.get(relation.cardId) || [];
         ids.push(relation.userId);
         memberIdsByCard.set(relation.cardId, ids);
@@ -256,8 +259,8 @@ export class BoardController {
       const { boardId } = req.params;
       const { email } = req.body;
 
-      const newMember = await boardService.addMember(boardId, callerUserId, email);
-      res.status(201).json(newMember);
+      const invitation = await boardInvitationService.invite(boardId, callerUserId, email);
+      res.status(202).json(invitation);
     } catch (error: any) {
       ResponseView.error(res, error.message || 'Lỗi mời thành viên', error.statusCode || 400);
     }

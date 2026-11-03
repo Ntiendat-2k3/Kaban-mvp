@@ -30,7 +30,7 @@ export class ResponseView {
     const isShortForm = typeof messageOrStatus === 'number';
     const status = isShortForm ? messageOrStatus : statusCode;
     const code = isShortForm
-      ? ({ 400: 'BAD_REQUEST', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT', 422: 'VALIDATION_ERROR', 500: 'INTERNAL_ERROR' } as Record<number, string>)[status] || 'ERROR'
+      ? ({ 400: 'BAD_REQUEST', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT', 422: 'VALIDATION_ERROR', 424: 'FAILED_DEPENDENCY', 500: 'INTERNAL_ERROR' } as Record<number, string>)[status] || 'ERROR'
       : codeOrMessage;
     const message = status >= 500 ? 'Lỗi máy chủ. Vui lòng thử lại sau.' : isShortForm ? codeOrMessage : messageOrStatus;
     return res.status(status).json({

@@ -7,6 +7,7 @@ import {
   BoardBackground,
 } from '../interfaces/IBoardRepository.js';
 import { Board, BoardMember, BoardStar, User, Label } from '../../models/index.js';
+import { sequelize } from '../../config/database.js';
 
 export class SequelizeBoardRepository
   extends SequelizeBaseRepository<any, Board>
@@ -230,10 +231,22 @@ export class SequelizeBoardRepository
   }
 
   async removeMember(boardId: string, userId: string): Promise<boolean> {
-    const deletedCount = await BoardMember.destroy({
-      where: { boardId, userId },
+    return sequelize.transaction(async (transaction) => {
+      const deletedCount = await BoardMember.destroy({
+        where: { boardId, userId },
+        transaction,
+      });
+      if (deletedCount === 0) return false;
+
+      // Gỡ mọi thẻ đã gán trong bảng để người rời bảng không còn trong danh sách nhận nhắc hạn.
+      await sequelize.query(`
+        DELETE FROM "card_members"
+        WHERE "userId" = :userId
+          AND "cardId" IN (SELECT "id" FROM "cards" WHERE "boardId" = :boardId)
+      `, { replacements: { boardId, userId }, transaction });
+      await BoardStar.destroy({ where: { boardId, userId }, transaction });
+      return true;
     });
-    return deletedCount > 0;
   }
 
   async getUserRole(boardId: string, userId: string): Promise<'owner' | 'member' | null> {

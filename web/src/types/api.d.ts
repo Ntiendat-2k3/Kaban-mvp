@@ -154,8 +154,45 @@ export interface paths {
         };
         get: operations["listBoardMembers"];
         put?: never;
-        /** @description Chỉ owner. 404 USER_NOT_FOUND nếu email chưa đăng ký; 409 ALREADY_MEMBER nếu đã là thành viên. */
-        post: operations["addBoardMember"];
+        /** @description Owner gửi link mời dùng một lần, hiệu lực 7 ngày, tới cả email chưa đăng ký. Quyền bảng chỉ được cấp khi người nhận chấp nhận bằng đúng email. */
+        post: operations["inviteBoardMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getBoardInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Tài khoản đăng nhập phải có đúng email được mời; token chỉ dùng một lần. */
+        post: operations["acceptBoardInvitation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1281,7 +1318,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    addBoardMember: {
+    inviteBoardMember: {
         parameters: {
             query?: never;
             header?: never;
@@ -1299,19 +1336,92 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            201: {
+            /** @description Đã gửi lời mời */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Member"];
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                    };
                 };
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Validation"];
+            /** @description Brevo từ chối IP hoặc thông tin đăng nhập SMTP */
+            424: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chưa cấu hình SMTP hoặc gửi email thất bại */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getBoardInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lời mời còn hiệu lực */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        boardName: string;
+                        /** Format: email */
+                        email: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    acceptBoardInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã tham gia */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        boardId: string;
+                    };
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     removeBoardMember: {

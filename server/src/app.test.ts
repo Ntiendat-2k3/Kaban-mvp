@@ -14,3 +14,13 @@ describe('bảo vệ API xác thực', () => {
     expect(limited.body.error.code).toBe('TOO_MANY_REQUESTS');
   });
 });
+
+describe('link mời thành viên', () => {
+  it('chặn token sai định dạng và yêu cầu đăng nhập trước khi chấp nhận', async () => {
+    const invalid = await request(app).get('/api/invitations/invalid');
+    expect(invalid.status).toBe(422);
+
+    const unauthorized = await request(app).post(`/api/invitations/${'a'.repeat(43)}/accept`);
+    expect(unauthorized.status).toBe(401);
+  });
+});
